@@ -48,3 +48,18 @@ class FileService:
         if not os.path.exists(filepath):
             raise HTTPException(status_code=404, detail="File not found.")
         return pd.read_parquet(filepath, engine="pyarrow")
+
+    def cleanup_file(self, file_id: str):
+        """
+        Deletes the specified parquet file and its associated export CSV to free memory.
+        """
+        try:
+            if os.path.exists(file_id):
+                os.remove(file_id)
+            
+            export_path = file_id.replace(".parquet", "_export.csv")
+            if os.path.exists(export_path):
+                os.remove(export_path)
+        except Exception as e:
+            # We explicitly don't throw an error here to not block the user interaction
+            print(f"Failed to cleanup files for {file_id}: {e}")

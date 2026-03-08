@@ -75,3 +75,12 @@ async def export_dataset(file_id: str):
         filename=filename, 
         media_type='text/csv'
     )
+
+@router.delete("/cleanup")
+async def cleanup_dataset(file_id: str):
+    """
+    Deletes the dataset file from the server's uploads folder.
+    Intended to be called by the frontend when the user closes the page or starts a new session.
+    """
+    file_service.cleanup_file(file_id)
+    return {"message": "Files cleaned up successfully"}

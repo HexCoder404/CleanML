@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { usePipelineStore, CleanOperation } from "../store/pipelineStore";
 
 export default function Home() {
@@ -23,6 +23,19 @@ export default function Home() {
   const [scaleStrategy, setScaleStrategy] = useState<Exclude<CleanOperation["strategy"], undefined>>("standard");
   const [fillValue, setFillValue] = useState<string>("");
 
+  // Memory cleanup tracking
+  useEffect(() => {
+    return () => {
+      if (fileId) {
+        // Use browser keepalive to reliably send cleanup request even during unmount/close
+        fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/dataset/cleanup?file_id=${fileId}`, {
+          method: 'DELETE',
+          keepalive: true
+        }).catch(err => console.error("Cleanup failed", err));
+      }
+    };
+  }, [fileId]);
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       setFile(e.target.files[0]);
@@ -39,6 +52,11 @@ export default function Home() {
     formData.append("file", file);
 
     try {
+      // If there's an existing file, clean it up before uploading the new one
+      if (fileId) {
+         await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/dataset/cleanup?file_id=${fileId}`, { method: 'DELETE' }).catch(e => console.error(e));
+      }
+
       const uploadRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/dataset/upload`, {
         method: "POST",
         body: formData,
