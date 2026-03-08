@@ -1,0 +1,7 @@
+fastapi==0.115.11
+uvicorn[standard]==0.34.0
+gunicorn==23.0.0
+pandas==2.2.3
+pyarrow==19.0.1
+python-multipart==0.0.20
+scikit-learn==1.6.1
