@@ -39,7 +39,7 @@ export default function Home() {
     formData.append("file", file);
 
     try {
-      const uploadRes = await fetch("http://localhost:8000/api/dataset/upload", {
+      const uploadRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/dataset/upload`, {
         method: "POST",
         body: formData,
       });
@@ -53,14 +53,14 @@ export default function Home() {
       setFileId(uploadData.file_id);
 
       // Fetch Profile
-      const profileRes = await fetch(`http://localhost:8000/api/dataset/profile?file_id=${uploadData.file_id}`);
+      const profileRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/dataset/profile?file_id=${uploadData.file_id}`);
       if (!profileRes.ok) throw new Error("Failed to fetch profile");
       const profileData = await profileRes.json();
       setProfile(profileData);
       setPrevProfile(null); // Reset prev
 
       // Fetch Preview
-      const previewRes = await fetch(`http://localhost:8000/api/dataset/preview?file_id=${uploadData.file_id}&limit=10`);
+      const previewRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/dataset/preview?file_id=${uploadData.file_id}&limit=10`);
       if (!previewRes.ok) throw new Error("Failed to fetch preview");
       const previewData = await previewRes.json();
       setPreview(previewData);
@@ -105,7 +105,7 @@ export default function Home() {
     setError(null);
 
     try {
-      const cleanRes = await fetch("http://localhost:8000/api/dataset/clean", {
+      const cleanRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/dataset/clean`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ file_id: fileId, operations }),
@@ -121,13 +121,13 @@ export default function Home() {
       clearOperations(); // applied
 
       // Fetch Profile for newly cleaned dataset
-      const profileRes = await fetch(`http://localhost:8000/api/dataset/profile?file_id=${cleanData.file_id}`);
+      const profileRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/dataset/profile?file_id=${cleanData.file_id}`);
       if (!profileRes.ok) throw new Error("Failed to fetch profile");
       setPrevProfile(profile); // Save old profile
       setProfile(await profileRes.json());
 
       // Fetch Preview for newly cleaned dataset
-      const previewRes = await fetch(`http://localhost:8000/api/dataset/preview?file_id=${cleanData.file_id}&limit=10`);
+      const previewRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/dataset/preview?file_id=${cleanData.file_id}&limit=10`);
       if (!previewRes.ok) throw new Error("Failed to fetch preview");
       setPreview(await previewRes.json());
 
@@ -140,7 +140,8 @@ export default function Home() {
 
   const handleExport = () => {
     if (!fileId) return;
-    window.location.href = `http://localhost:8000/api/dataset/export?file_id=${fileId}`;
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+    window.location.href = `${baseUrl}/api/dataset/export?file_id=${fileId}`;
     setSuccessMsg("Dataset exported successfully!");
     setTimeout(() => setSuccessMsg(null), 4000);
   };
