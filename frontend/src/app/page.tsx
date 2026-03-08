@@ -13,11 +13,14 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  // Pipeline State
   const { operations, addOperation, removeOperation, clearOperations } = usePipelineStore();
   const [opType, setOpType] = useState<CleanOperation["type"]>("drop_duplicates");
   const [selectedCol, setSelectedCol] = useState<string>("");
+  
+  // Strategies
   const [imputeStrategy, setImputeStrategy] = useState<Exclude<CleanOperation["strategy"], undefined>>("mean");
+  const [encodeStrategy, setEncodeStrategy] = useState<Exclude<CleanOperation["strategy"], undefined>>("label");
+  const [scaleStrategy, setScaleStrategy] = useState<Exclude<CleanOperation["strategy"], undefined>>("standard");
   const [fillValue, setFillValue] = useState<string>("");
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -73,8 +76,7 @@ export default function Home() {
   };
 
   const handleAddOperation = () => {
-    if (opType === "impute" && !selectedCol) return;
-    if (opType === "drop_columns" && !selectedCol) return;
+    if ((opType === "impute" || opType === "drop_columns" || opType === "encode" || opType === "scale") && !selectedCol) return;
     if (opType === "impute" && imputeStrategy === "constant" && !fillValue) return;
 
     // Prevent duplicate operations on the same column
@@ -88,11 +90,13 @@ export default function Home() {
       type: opType,
       ...(selectedCol && opType !== "drop_duplicates" ? { columns: [selectedCol] } : {}),
       ...(opType === "impute" ? { strategy: imputeStrategy } : {}),
+      ...(opType === "encode" ? { strategy: encodeStrategy } : {}),
+      ...(opType === "scale" ? { strategy: scaleStrategy } : {}),
       ...(opType === "impute" && imputeStrategy === "constant" ? { fill_value: fillValue } : {})
     });
     
     // Reset selections slightly
-    if (opType === "drop_columns" || opType === "impute") setSelectedCol("");
+    if (opType === "drop_columns" || opType === "impute" || opType === "encode" || opType === "scale") setSelectedCol("");
   };
 
   const handleApplyPipeline = async () => {
@@ -312,10 +316,16 @@ export default function Home() {
                 <div className="flex-1 space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Operation Type</label>
-                    <select value={opType} onChange={(e: any) => setOpType(e.target.value)} className="w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 p-2 border">
-                      <option value="drop_duplicates">Remove Duplicate Rows</option>
-                      <option value="drop_columns">Drop Column</option>
-                      <option value="impute">Fill Missing Values (Impute)</option>
+                    <select value={opType} onChange={(e: any) => { setOpType(e.target.value); setSelectedCol(""); }} className="w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 p-2 border">
+                      <optgroup label="🧹 Data Cleaning">
+                        <option value="drop_duplicates">Remove Duplicate Rows</option>
+                        <option value="drop_columns">Drop Column</option>
+                        <option value="impute">Fill Missing Values (Impute)</option>
+                      </optgroup>
+                      <optgroup label="⚙️ Feature Engineering">
+                        <option value="encode">Encode Categorical (Strings only)</option>
+                        <option value="scale">Scale Numerical (Numerics only)</option>
+                      </optgroup>
                     </select>
                   </div>
 
@@ -331,6 +341,13 @@ export default function Home() {
                        }} className="w-full border-gray-300 rounded-md shadow-sm p-2 border">
                          <option value="">-- Select --</option>
                          {Object.keys(profile.columns)
+                           .filter(col => {
+                              // Filter out numeric for encode, filter out strings for scale
+                              const isNum = profile.columns[col].dtype.match(/(int|float|numeric)/i);
+                              if (opType === "encode" && isNum) return false;
+                              if (opType === "scale" && !isNum) return false;
+                              return true;
+                           })
                            .sort((a, b) => profile.columns[b].null_count - profile.columns[a].null_count) // Sort by missing values descending
                            .map(col => {
                              const isNum = profile.columns[col].dtype.match(/(int|float|numeric)/i);
@@ -375,6 +392,26 @@ export default function Home() {
                     </>
                   )}
 
+                  {opType === "encode" && (
+                     <div>
+                       <label className="block text-sm font-medium text-gray-700 mb-1">Encoding Strategy</label>
+                       <select value={encodeStrategy} onChange={(e: any) => setEncodeStrategy(e.target.value)} className="w-full border-gray-300 rounded-md shadow-sm p-2 border">
+                         <option value="label">Label Encoding (0, 1, 2...)</option>
+                         <option value="onehot">One-Hot Encoding (Creates new columns)</option>
+                       </select>
+                     </div>
+                  )}
+
+                  {opType === "scale" && (
+                     <div>
+                       <label className="block text-sm font-medium text-gray-700 mb-1">Scaling Strategy</label>
+                       <select value={scaleStrategy} onChange={(e: any) => setScaleStrategy(e.target.value)} className="w-full border-gray-300 rounded-md shadow-sm p-2 border">
+                         <option value="standard">Standard Scaler (Z-Score)</option>
+                         <option value="minmax">Min-Max Scaler (0 to 1)</option>
+                       </select>
+                     </div>
+                  )}
+
                   <button onClick={handleAddOperation} className="w-full py-2 px-4 bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium rounded-md transition-colors border border-gray-200">
                     Add Step to Pipeline
                   </button>
@@ -396,8 +433,14 @@ export default function Home() {
                                 {op.type === "drop_duplicates" && "Drop Duplicates"}
                                 {op.type === "drop_columns" && `Drop Col: ${op.columns?.join(", ")}`}
                                 {op.type === "impute" && `Impute: ${op.columns?.join(", ")}`}
+                                {op.type === "encode" && `Encode: ${op.columns?.join(", ")}`}
+                                {op.type === "scale" && `Scale: ${op.columns?.join(", ")}`}
                               </p>
-                              {op.type === "impute" && <p className="text-xs text-gray-500">Strategy: {op.strategy} {op.fill_value && `(${op.fill_value})`}</p>}
+                              {op.type !== "drop_duplicates" && op.type !== "drop_columns" && (
+                                <p className="text-xs text-gray-500">
+                                  Strategy: {op.strategy === "onehot" ? "One-Hot" : op.strategy === "label" ? "Label" : op.strategy} {op.fill_value && `(${op.fill_value})`}
+                                </p>
+                              )}
                             </div>
                           </div>
                           <button onClick={() => removeOperation(op.id)} className="text-gray-400 hover:text-red-500 transition-colors p-1" title="Remove Step">

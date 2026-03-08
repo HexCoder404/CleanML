@@ -2,6 +2,7 @@ import pandas as pd
 import os
 import uuid
 from typing import List
+from sklearn.preprocessing import LabelEncoder, StandardScaler, MinMaxScaler
 from models.cleaning import CleanOperation
 from utils.exceptions import ProcessingError
 
@@ -51,6 +52,42 @@ class CleanService:
                             df_clean = df_clean.dropna(subset=[col])
                         else:
                             raise ProcessingError(f"Unknown impute strategy: {op.strategy}")
+                
+                elif op.type == "encode":
+                    if not op.columns:
+                        raise ProcessingError("Columns must be specified for encode operation")
+                    for col in op.columns:
+                        if col not in df_clean.columns:
+                            continue
+                        
+                        if op.strategy == "label":
+                            le = LabelEncoder()
+                            # Handle NaNs by converting to string first for label encoding
+                            df_clean[col] = le.fit_transform(df_clean[col].astype(str))
+                        elif op.strategy == "onehot":
+                            df_clean = pd.get_dummies(df_clean, columns=[col], drop_first=True)
+                        else:
+                            raise ProcessingError(f"Unknown encode strategy: {op.strategy}")
+
+                elif op.type == "scale":
+                    if not op.columns:
+                        raise ProcessingError("Columns must be specified for scale operation")
+                    
+                    # Ensure we only scale numeric columns
+                    numeric_cols = [c for c in op.columns if c in df_clean.columns and pd.api.types.is_numeric_dtype(df_clean[c])]
+                    
+                    if not numeric_cols:
+                        continue
+                        
+                    if op.strategy == "standard":
+                        scaler = StandardScaler()
+                        df_clean[numeric_cols] = scaler.fit_transform(df_clean[numeric_cols])
+                    elif op.strategy == "minmax":
+                        scaler = MinMaxScaler()
+                        df_clean[numeric_cols] = scaler.fit_transform(df_clean[numeric_cols])
+                    else:
+                        raise ProcessingError(f"Unknown scale strategy: {op.strategy}")
+
                 else:
                     raise ProcessingError(f"Unknown operation type: {op.type}")
             except ProcessingError as pe:

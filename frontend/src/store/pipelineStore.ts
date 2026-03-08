@@ -2,9 +2,9 @@ import { create } from 'zustand';
 
 export type CleanOperation = {
   id: string;
-  type: "drop_duplicates" | "drop_columns" | "impute";
+  type: "drop_duplicates" | "drop_columns" | "impute" | "encode" | "scale";
   columns?: string[];
-  strategy?: "mean" | "median" | "mode" | "constant" | "drop";
+  strategy?: "mean" | "median" | "mode" | "constant" | "drop" | "label" | "onehot" | "standard" | "minmax";
   fill_value?: any;
 };
 
