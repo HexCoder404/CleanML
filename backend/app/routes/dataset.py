@@ -1,11 +1,14 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from services.file_service import FileService
 from services.profile_service import ProfileService
+from services.clean_service import CleanService
+from models.cleaning import CleanRequest
 from typing import Dict, Any
 
 router = APIRouter()
 file_service = FileService()
 profile_service = ProfileService()
+clean_service = CleanService()
 
 @router.post("/upload")
 async def upload_dataset(file: UploadFile = File(...)):
@@ -35,3 +38,40 @@ async def get_preview(file_id: str, limit: int = 100):
     # Return first `limit` rows as a list of dictionaries. Handle NaNs.
     preview_df = df.head(limit).fillna("")
     return preview_df.to_dict(orient="records")
+
+@router.post("/clean")
+async def clean_dataset(request: CleanRequest):
+    """
+    Endpoint to apply cleaning operations to a dataset.
+    Returns the new file_id (path) generated from the operations.
+    """
+    df = file_service.read_parquet(request.file_id)
+    df_clean = clean_service.apply_operations(df, request.operations)
+    
+    new_file_id = clean_service.save_cleaned_dataset(df_clean, request.file_id)
+    
+    return {
+        "message": "Dataset cleaned successfully",
+        "file_id": new_file_id
+    }
+
+@router.get("/export")
+async def export_dataset(file_id: str):
+    """
+    Exports a parquet file back to a downloadable CSV.
+    """
+    import os
+    from fastapi.responses import FileResponse
+    
+    df = file_service.read_parquet(file_id)
+    export_path = file_id.replace(".parquet", "_export.csv")
+    
+    df.to_csv(export_path, index=False)
+    
+    filename = os.path.basename(export_path)
+    
+    return FileResponse(
+        path=export_path, 
+        filename=filename, 
+        media_type='text/csv'
+    )

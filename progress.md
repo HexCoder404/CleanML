@@ -4,9 +4,9 @@ This file tracks the completion of Phase 1: MVP Development.
 ## Phase 1 Feature Track
 - [x] **Foundation**: Scaffold frontend, backend
 - [x] **Upload & Profile**: File to Parquet, Dataset Preview, StatCards, Navbar, Loading States, Missing Values Card
-- [ ] **Data Cleaning**: Imputation, row/column drops
+- [x] **Data Cleaning**: Imputation, row/column drops, Type-aware logic
 - [ ] **Feature Engineering**: Encoders, Scalers
-- [ ] **Export & Finish**: CSV export, Pipeline visualiser, Polish
+- [/] **Export & Finish**: CSV export, Pipeline visualiser, Polish, Documentation
 
 ## Current Status
 - Extracted and analyzed requirements from PDF document.
