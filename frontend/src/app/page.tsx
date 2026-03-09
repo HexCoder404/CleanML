@@ -515,7 +515,6 @@ export default function Home() {
                                  <button onClick={() => {
                                     const { explanation, category, ...cleanOp } = sugg;
                                     addOperation(cleanOp);
-                                    markSuggestionsSeen();
                                  }} className="shrink-0 py-1.5 px-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold rounded-md border border-indigo-200 transition-colors w-max self-start xl:self-auto">
                                     Add
                                  </button>
@@ -546,7 +545,6 @@ export default function Home() {
                                  <button onClick={() => {
                                     const { explanation, category, ...cleanOp } = sugg;
                                     addOperation(cleanOp);
-                                    markSuggestionsSeen();
                                  }} className="shrink-0 py-1.5 px-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold rounded-md border border-indigo-200 transition-colors w-max self-start xl:self-auto">
                                     Add
                                  </button>
