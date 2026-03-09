@@ -14,7 +14,7 @@ export default function Home() {
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
 
-  const { operations, addOperation, removeOperation, clearOperations } = usePipelineStore();
+  const { operations, hasSeenSuggestions, addOperation, removeOperation, clearOperations, markSuggestionsSeen, resetSuggestions } = usePipelineStore();
   const [opType, setOpType] = useState<CleanOperation["type"]>("drop_duplicates");
   const [selectedCol, setSelectedCol] = useState<string>("");
   
@@ -105,6 +105,7 @@ export default function Home() {
       
       // Reset pipeline automatically on new upload
       clearOperations();
+      resetSuggestions();
 
     } catch (err: any) {
       setError(err.message);
@@ -482,7 +483,7 @@ export default function Home() {
             </section>
 
             {/* Smart Suggestions */}
-            {smartSuggestions.length > 0 && (
+            {smartSuggestions.length > 0 && !hasSeenSuggestions && (
               <section className="bg-gradient-to-r from-indigo-50 to-white rounded-xl shadow-sm border border-indigo-100 overflow-hidden mt-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <div className="px-6 py-4 border-b border-indigo-100 bg-indigo-50/80 flex items-center justify-between">
                   <h2 className="text-lg font-semibold text-indigo-900 flex items-center space-x-2">
@@ -514,6 +515,7 @@ export default function Home() {
                                  <button onClick={() => {
                                     const { explanation, category, ...cleanOp } = sugg;
                                     addOperation(cleanOp);
+                                    markSuggestionsSeen();
                                  }} className="shrink-0 py-1.5 px-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold rounded-md border border-indigo-200 transition-colors w-max self-start xl:self-auto">
                                     Add
                                  </button>
@@ -544,6 +546,7 @@ export default function Home() {
                                  <button onClick={() => {
                                     const { explanation, category, ...cleanOp } = sugg;
                                     addOperation(cleanOp);
+                                    markSuggestionsSeen();
                                  }} className="shrink-0 py-1.5 px-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold rounded-md border border-indigo-200 transition-colors w-max self-start xl:self-auto">
                                     Add
                                  </button>
@@ -560,6 +563,7 @@ export default function Home() {
                               const { explanation, category, ...cleanOp } = s;
                               addOperation(cleanOp);
                            });
+                           markSuggestionsSeen();
                         }} className="py-2.5 px-6 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-md shadow-sm transition-all hover:shadow-md flex items-center space-x-2">
                            <svg className="w-5 h-5 text-indigo-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
                            <span>Apply All Suggestions</span>

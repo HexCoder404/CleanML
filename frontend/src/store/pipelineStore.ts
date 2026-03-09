@@ -10,18 +10,24 @@ export type CleanOperation = {
 
 interface PipelineState {
   operations: CleanOperation[];
+  hasSeenSuggestions: boolean;
   addOperation: (op: Omit<CleanOperation, "id">) => void;
   removeOperation: (id: string) => void;
   clearOperations: () => void;
+  markSuggestionsSeen: () => void;
+  resetSuggestions: () => void;
 }
 
 export const usePipelineStore = create<PipelineState>((set) => ({
   operations: [],
+  hasSeenSuggestions: false,
   addOperation: (op) => set((state) => ({ 
     operations: [...state.operations, { ...op, id: Math.random().toString(36).substr(2, 9) }] 
   })),
   removeOperation: (id) => set((state) => ({ 
     operations: state.operations.filter(op => op.id !== id) 
   })),
-  clearOperations: () => set({ operations: [] })
+  clearOperations: () => set({ operations: [] }),
+  markSuggestionsSeen: () => set({ hasSeenSuggestions: true }),
+  resetSuggestions: () => set({ hasSeenSuggestions: false })
 }));
