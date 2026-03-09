@@ -20,6 +20,7 @@ class ProfileService:
                 "dtype": dtype,
                 "null_count": null_count,
                 "null_percent": null_percent,
+                "unique_count": int(series.nunique())
             }
             
             if pd.api.types.is_numeric_dtype(series):
