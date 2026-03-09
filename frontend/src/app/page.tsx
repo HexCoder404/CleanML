@@ -189,10 +189,12 @@ export default function Home() {
   
   const isNumericCol = selectedCol && profile?.columns[selectedCol]?.dtype.match(/(int|float|numeric)/i);
 
-  const getSmartSuggestions = (): Omit<CleanOperation, "id">[] => {
+  type Suggestion = Omit<CleanOperation, "id"> & { explanation: string };
+
+  const getSmartSuggestions = (): Suggestion[] => {
     if (!profile) return [];
     
-    const suggestions: Omit<CleanOperation, "id">[] = [];
+    const suggestions: Suggestion[] = [];
     const idPatterns = ["id", "index", "uuid"];
     const avoidEncodePatterns = ["title", "description", "name", "date", "url"];
 
@@ -211,6 +213,7 @@ export default function Home() {
           type: "impute",
           columns: [colName],
           strategy: isNum ? "median" : "mode",
+          explanation: `Missing ${colInfo.null_count} values (${colInfo.null_percent}%). Best to fill with ${isNum ? 'median' : 'mode'} to maintain distribution.`
         });
       }
     });
@@ -231,6 +234,7 @@ export default function Home() {
           type: "encode",
           columns: [colName],
           strategy: "label",
+          explanation: `Categorical text data cannot be fed into Machine Learning models directly. Label encoding converts this to numbers.`
         });
         encodeCount++;
       }
@@ -250,6 +254,7 @@ export default function Home() {
            type: "scale",
            columns: [colName],
            strategy: "standard",
+           explanation: 'Numeric values should be scaled (standardized) so ML models do not give them biased weight due to large ranges.'
          });
          scaleCount++;
       }
@@ -258,7 +263,10 @@ export default function Home() {
     return suggestions;
   };
   
-  const smartSuggestions = profile ? getSmartSuggestions() : [];
+  // Get suggestions and filter out any that already have an operation applied to their column
+  const smartSuggestions = profile 
+    ? getSmartSuggestions().filter(sugg => !operations.some(op => op.columns?.includes(sugg.columns?.[0] || "")))
+    : [];
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 font-sans">
@@ -423,7 +431,7 @@ export default function Home() {
             </section>
 
             {/* Smart Suggestions */}
-            {smartSuggestions.length > 0 && operations.length === 0 && (
+            {smartSuggestions.length > 0 && (
               <section className="bg-gradient-to-r from-indigo-50 to-white rounded-xl shadow-sm border border-indigo-100 overflow-hidden mt-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <div className="px-6 py-4 border-b border-indigo-100 bg-indigo-50/80 flex items-center justify-between">
                   <h2 className="text-lg font-semibold text-indigo-900 flex items-center space-x-2">
@@ -431,25 +439,43 @@ export default function Home() {
                   </h2>
                 </div>
                 <div className="p-6">
-                  <p className="text-indigo-800 font-medium mb-4">We analyzed your dataset and found issues. Suggested Pipeline:</p>
+                  <p className="text-indigo-800 font-medium mb-4">We analyzed your dataset and found issues. You can add these suggested steps to your pipeline:</p>
                   <div className="space-y-3 mb-6">
                      {smartSuggestions.map((sugg, idx) => (
-                        <div key={idx} className="flex items-center space-x-3 bg-white p-3 rounded-lg border border-indigo-100 shadow-sm max-w-xl">
-                           <span className="bg-indigo-100 text-indigo-800 text-xs font-bold px-3 py-1 rounded-full">{idx + 1}</span>
-                           <span className="text-sm font-medium text-gray-800">
-                                {sugg.type === "impute" && `Impute "${sugg.columns?.[0]}" → ${sugg.strategy === 'median' ? 'Median' : 'Mode'}`}
-                                {sugg.type === "encode" && `Encode "${sugg.columns?.[0]}"`}
-                                {sugg.type === "scale" && `Scale "${sugg.columns?.[0]}"`}
-                           </span>
+                        <div key={idx} className="flex flex-col sm:flex-row sm:items-center justify-between bg-white p-4 rounded-lg border border-indigo-100 shadow-sm gap-4">
+                           <div className="flex items-start space-x-3">
+                               <span className="bg-indigo-100 text-indigo-800 text-xs font-bold px-3 py-1 rounded-full mt-0.5">{idx + 1}</span>
+                               <div>
+                                   <span className="text-sm font-bold text-gray-900 block mb-1">
+                                        {sugg.type === "impute" && `Impute "${sugg.columns?.[0]}" → ${sugg.strategy === 'median' ? 'Median' : 'Mode'}`}
+                                        {sugg.type === "encode" && `Encode "${sugg.columns?.[0]}"`}
+                                        {sugg.type === "scale" && `Scale "${sugg.columns?.[0]}"`}
+                                   </span>
+                                   <span className="text-xs text-gray-500">{sugg.explanation}</span>
+                               </div>
+                           </div>
+                           <button onClick={() => {
+                              // Re-use logic to strip out the explanation before saving to store
+                              const { explanation, ...cleanOp } = sugg;
+                              addOperation(cleanOp);
+                           }} className="shrink-0 py-2 px-4 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-sm font-semibold rounded-md border border-indigo-200 transition-colors flex items-center space-x-2">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg>
+                              <span>Add to Pipeline</span>
+                           </button>
                         </div>
                      ))}
                   </div>
-                  <button onClick={() => {
-                     smartSuggestions.forEach(s => addOperation(s));
-                  }} className="py-2.5 px-6 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-md shadow-sm transition-all hover:shadow-md flex items-center space-x-2">
-                     <svg className="w-5 h-5 text-indigo-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-                     <span>Apply Suggested Pipeline</span>
-                  </button>
+                  {smartSuggestions.length > 1 && (
+                     <button onClick={() => {
+                        smartSuggestions.forEach(s => {
+                           const { explanation, ...cleanOp } = s;
+                           addOperation(cleanOp);
+                        });
+                     }} className="py-2.5 px-6 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-md shadow-sm transition-all hover:shadow-md flex items-center space-x-2">
+                        <svg className="w-5 h-5 text-indigo-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                        <span>Apply All Suggestions</span>
+                     </button>
+                  )}
                 </div>
               </section>
             )}

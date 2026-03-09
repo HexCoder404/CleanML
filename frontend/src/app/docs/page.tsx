@@ -46,14 +46,26 @@ export default function Docs() {
           </div>
 
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-indigo-600">3. Building the Pipeline</h3>
+            <h3 className="text-lg font-semibold text-indigo-600">3. ✨ Smart Suggestions</h3>
             <p className="text-gray-600">
-              The Data Cleaning Operations wizard is where the magic happens. Here you create sequences.
+              Muddling through large datasets can be tiresome, which is why CleanML features an intelligent suggestion engine. 
+              After profiling, CleanML will scan your dataset and proactively recommend specific Data Cleaning and Feature Engineering 
+              steps—complete with explanations for <em>why</em> they are needed. You can review and add these individually to your pipeline, 
+              or apply them all at once to fast-track your machine learning prep.
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold text-indigo-600">4. Building the Pipeline manually</h3>
+            <p className="text-gray-600">
+              The Data Cleaning Operations wizard is where you can manually create robust sequences.
             </p>
             <ul className="list-disc pl-6 space-y-2 text-gray-600">
               <li><strong>Impute Missing Values:</strong> Select a target column. If the column has Missing Values, you can select from Mean, Median, Mode, Constant Replacement, or outright Dropping rows. (Mean/Median are locked for Strings).</li>
               <li><strong>Drop Columns:</strong> Specify highly corrupted or un-usable ID columns to shrink the dimensionality of your model.</li>
               <li><strong>Drop Duplicates:</strong> Clear identically repeating rows entirely.</li>
+              <li><strong>Encode Categorical:</strong> Convert text-based groups into ML-readable formats using Label Encoding or One-Hot Encoding.</li>
+              <li><strong>Scale Numerical:</strong> Standardize large numeric ranges using Z-Score and Min-Max scaling to prevent your model from learning biased weights.</li>
             </ul>
             <p className="text-gray-500 italic mt-2 text-sm bg-gray-50 p-4 rounded-lg border-l-4 border-indigo-400">
               <strong>Example Workflow:</strong> You upload &apos;netflix_titles.csv&apos;. You notice &apos;director&apos; has 2,634 missing values. You select Impute -&gt; &apos;director&apos; -&gt; Constant Value -&gt; &quot;Unknown&quot;. Finally, add another step to Drop Duplicates.
@@ -61,7 +73,7 @@ export default function Docs() {
           </div>
 
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-indigo-600">4. Processing & Output</h3>
+            <h3 className="text-lg font-semibold text-indigo-600">5. Processing & Output</h3>
             <p className="text-gray-600">
               Click <strong>Apply Pipeline</strong>. CleanML runs these sequential tasks. Our interface instantly flashes visual <span className="line-through text-red-400">Before</span> vs <span>After</span> statistics demonstrating the impact of your pipeline on your dataset.
 
