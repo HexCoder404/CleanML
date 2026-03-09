@@ -189,6 +189,77 @@ export default function Home() {
   
   const isNumericCol = selectedCol && profile?.columns[selectedCol]?.dtype.match(/(int|float|numeric)/i);
 
+  const getSmartSuggestions = (): Omit<CleanOperation, "id">[] => {
+    if (!profile) return [];
+    
+    const suggestions: Omit<CleanOperation, "id">[] = [];
+    const idPatterns = ["id", "index", "uuid"];
+    const avoidEncodePatterns = ["title", "description", "name", "date", "url"];
+
+    const sortedCols = Object.keys(profile.columns).sort((a, b) => profile.columns[b].null_count - profile.columns[a].null_count);
+
+    // 1. Impute missing values
+    sortedCols.forEach((colName) => {
+      const lowerCol = colName.toLowerCase();
+      if (idPatterns.some((pattern) => lowerCol.includes(pattern))) return;
+
+      const colInfo = profile.columns[colName];
+      const isNum = colInfo.dtype.match(/(int|float|numeric)/i);
+
+      if (colInfo.null_count > 0 && suggestions.length < 5) {
+        suggestions.push({
+          type: "impute",
+          columns: [colName],
+          strategy: isNum ? "median" : "mode",
+        });
+      }
+    });
+
+    // 2. Feature Engineering: Encode
+    let encodeCount = 0;
+    Object.keys(profile.columns).forEach((colName) => {
+      const lowerCol = colName.toLowerCase();
+      if (idPatterns.some((pattern) => lowerCol.includes(pattern))) return;
+      if (avoidEncodePatterns.some((pattern) => lowerCol.includes(pattern))) return;
+
+      const colInfo = profile.columns[colName];
+      const isNum = colInfo.dtype.match(/(int|float|numeric)/i);
+
+      // Only recommend encoding on non-numeric, with reasonable missing count, avoid suggesting everything
+      if (!isNum && encodeCount < 2) {
+        suggestions.push({
+          type: "encode",
+          columns: [colName],
+          strategy: "label",
+        });
+        encodeCount++;
+      }
+    });
+
+    // 3. Feature Engineering: Scale
+    let scaleCount = 0;
+    Object.keys(profile.columns).forEach((colName) => {
+      const lowerCol = colName.toLowerCase();
+      if (idPatterns.some((pattern) => lowerCol.includes(pattern))) return;
+
+      const colInfo = profile.columns[colName];
+      const isNum = colInfo.dtype.match(/(int|float|numeric)/i);
+
+      if (isNum && scaleCount < 2) {
+         suggestions.push({
+           type: "scale",
+           columns: [colName],
+           strategy: "standard",
+         });
+         scaleCount++;
+      }
+    });
+
+    return suggestions;
+  };
+  
+  const smartSuggestions = profile ? getSmartSuggestions() : [];
+
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 font-sans">
       {/* Navbar */}
@@ -350,6 +421,38 @@ export default function Home() {
                 </table>
               </div>
             </section>
+
+            {/* Smart Suggestions */}
+            {smartSuggestions.length > 0 && operations.length === 0 && (
+              <section className="bg-gradient-to-r from-indigo-50 to-white rounded-xl shadow-sm border border-indigo-100 overflow-hidden mt-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="px-6 py-4 border-b border-indigo-100 bg-indigo-50/80 flex items-center justify-between">
+                  <h2 className="text-lg font-semibold text-indigo-900 flex items-center space-x-2">
+                    <span>✨ Smart Suggestions</span>
+                  </h2>
+                </div>
+                <div className="p-6">
+                  <p className="text-indigo-800 font-medium mb-4">We analyzed your dataset and found issues. Suggested Pipeline:</p>
+                  <div className="space-y-3 mb-6">
+                     {smartSuggestions.map((sugg, idx) => (
+                        <div key={idx} className="flex items-center space-x-3 bg-white p-3 rounded-lg border border-indigo-100 shadow-sm max-w-xl">
+                           <span className="bg-indigo-100 text-indigo-800 text-xs font-bold px-3 py-1 rounded-full">{idx + 1}</span>
+                           <span className="text-sm font-medium text-gray-800">
+                                {sugg.type === "impute" && `Impute "${sugg.columns?.[0]}" → ${sugg.strategy === 'median' ? 'Median' : 'Mode'}`}
+                                {sugg.type === "encode" && `Encode "${sugg.columns?.[0]}"`}
+                                {sugg.type === "scale" && `Scale "${sugg.columns?.[0]}"`}
+                           </span>
+                        </div>
+                     ))}
+                  </div>
+                  <button onClick={() => {
+                     smartSuggestions.forEach(s => addOperation(s));
+                  }} className="py-2.5 px-6 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-md shadow-sm transition-all hover:shadow-md flex items-center space-x-2">
+                     <svg className="w-5 h-5 text-indigo-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                     <span>Apply Suggested Pipeline</span>
+                  </button>
+                </div>
+              </section>
+            )}
 
             {/* Data Cleaning Pipeline UI */}
             <section className="bg-white rounded-xl shadow-sm border border-gray-100 mt-8">
