@@ -23,7 +23,7 @@ export default function Home() {
   const [history, setHistory] = useState<HistoryStep[]>([]);
   const sessionFiles = useRef<Set<string>>(new Set());
 
-  const { operations, hasSeenSuggestions, addOperation, removeOperation, clearOperations, markSuggestionsSeen, resetSuggestions } = usePipelineStore();
+  const { operations, hasSeenSuggestions, currentFileId, addOperation, removeOperation, clearOperations, markSuggestionsSeen, resetSuggestions, setCurrentFileId } = usePipelineStore();
   const [opType, setOpType] = useState<CleanOperation["type"]>("drop_duplicates");
   const [selectedCol, setSelectedCol] = useState<string>("");
   
@@ -104,6 +104,7 @@ export default function Home() {
 
       const uploadData = await uploadRes.json();
       setFileId(uploadData.file_id);
+      setCurrentFileId(uploadData.file_id);
       sessionFiles.current.add(uploadData.file_id);
 
       // Fetch Profile
@@ -184,6 +185,7 @@ export default function Home() {
       }
       
       setFileId(cleanData.file_id); // Update fileId to the newly cleaned parquet
+      setCurrentFileId(cleanData.file_id);
       sessionFiles.current.add(cleanData.file_id);
       clearOperations(); // applied
 
@@ -349,8 +351,9 @@ export default function Home() {
           <span className="text-2xl font-extrabold tracking-tight">CleanML</span>
         </div>
         <div className="hidden md:flex space-x-6 text-sm font-medium text-gray-500">
-          <a href="/docs" target="_blank" className="hover:text-indigo-600 transition-colors">Documentation</a>
-          <a href="https://github.com/HexCoder404/CleanML" target="_blank" className="hover:text-indigo-600 transition-colors">GitHub Repo</a>
+          <a href="/" className="hover:text-indigo-600 transition-colors font-semibold text-gray-700">Clean</a>
+          <a href="/visualize" className="hover:text-indigo-600 transition-colors">Visualize Data</a>
+          <a href="/docs" target="_blank" className="hover:text-indigo-600 transition-colors">Docs</a>
         </div>
       </nav>
 

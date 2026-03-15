@@ -1,11 +1,12 @@
 from fastapi import FastAPI
-from app.routes import dataset
+from app.routes import dataset, visualization
 from app.utils.exceptions import ProcessingError, processing_exception_handler
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="CleanML API")
 app.add_exception_handler(ProcessingError, processing_exception_handler)
 app.include_router(dataset.router, prefix="/api/dataset", tags=["Dataset"])
+app.include_router(visualization.router, prefix="/api/visualization", tags=["Visualization"])
 
 # Setup CORS
 app.add_middleware(
