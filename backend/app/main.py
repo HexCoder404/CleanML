@@ -1,6 +1,6 @@
 from fastapi import FastAPI
-from routes import dataset
-from utils.exceptions import ProcessingError, processing_exception_handler
+from app.routes import dataset
+from app.utils.exceptions import ProcessingError, processing_exception_handler
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="CleanML API")

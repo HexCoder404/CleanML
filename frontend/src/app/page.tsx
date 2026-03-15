@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { usePipelineStore, CleanOperation } from "../store/pipelineStore";
 
 export default function Home() {
@@ -14,6 +14,15 @@ export default function Home() {
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
 
+  type HistoryStep = {
+    fileId: string;
+    profile: any;
+    preview: any[];
+    prevProfile: any;
+  };
+  const [history, setHistory] = useState<HistoryStep[]>([]);
+  const sessionFiles = useRef<Set<string>>(new Set());
+
   const { operations, hasSeenSuggestions, addOperation, removeOperation, clearOperations, markSuggestionsSeen, resetSuggestions } = usePipelineStore();
   const [opType, setOpType] = useState<CleanOperation["type"]>("drop_duplicates");
   const [selectedCol, setSelectedCol] = useState<string>("");
@@ -26,16 +35,20 @@ export default function Home() {
 
   // Memory cleanup tracking
   useEffect(() => {
-    return () => {
-      if (fileId) {
-        // Use browser keepalive to reliably send cleanup request even during unmount/close
-        fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/dataset/cleanup?file_id=${fileId}`, {
+    const cleanup = () => {
+      sessionFiles.current.forEach(id => {
+        fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/dataset/cleanup?file_id=${id}`, {
           method: 'DELETE',
           keepalive: true
         }).catch(err => console.error("Cleanup failed", err));
-      }
+      });
     };
-  }, [fileId]);
+    window.addEventListener('beforeunload', cleanup);
+    return () => {
+      window.removeEventListener('beforeunload', cleanup);
+      cleanup();
+    };
+  }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -72,10 +85,12 @@ export default function Home() {
     formData.append("file", file);
 
     try {
-      // If there's an existing file, clean it up before uploading the new one
-      if (fileId) {
-         await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/dataset/cleanup?file_id=${fileId}`, { method: 'DELETE' }).catch(e => console.error(e));
-      }
+      // Clear previous session files to save space
+      sessionFiles.current.forEach(id => {
+         fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/dataset/cleanup?file_id=${id}`, { method: 'DELETE' }).catch(e => console.error(e));
+      });
+      sessionFiles.current.clear();
+      setHistory([]);
 
       const uploadRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/dataset/upload`, {
         method: "POST",
@@ -89,6 +104,7 @@ export default function Home() {
 
       const uploadData = await uploadRes.json();
       setFileId(uploadData.file_id);
+      sessionFiles.current.add(uploadData.file_id);
 
       // Fetch Profile
       const profileRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/dataset/profile?file_id=${uploadData.file_id}`);
@@ -156,7 +172,19 @@ export default function Home() {
       }
 
       const cleanData = await cleanRes.json();
+      
+      // Save current state to history before updating
+      if (fileId && profile && preview) {
+        setHistory(prev => [...prev, {
+          fileId,
+          profile,
+          preview,
+          prevProfile
+        }]);
+      }
+      
       setFileId(cleanData.file_id); // Update fileId to the newly cleaned parquet
+      sessionFiles.current.add(cleanData.file_id);
       clearOperations(); // applied
 
       // Fetch Profile for newly cleaned dataset
@@ -175,6 +203,22 @@ export default function Home() {
     } finally {
       setCleaning(false);
     }
+  };
+
+  const handleRevert = () => {
+    if (history.length === 0) return;
+    const lastStep = history[history.length - 1];
+    
+    setFileId(lastStep.fileId);
+    setProfile(lastStep.profile);
+    setPreview(lastStep.preview);
+    setPrevProfile(lastStep.prevProfile);
+    
+    setHistory(prev => prev.slice(0, -1));
+    resetSuggestions(); // Restore suggestions per user request
+
+    setSuccessMsg("Reverted to previous step.");
+    setTimeout(() => setSuccessMsg(null), 3000);
   };
 
   const handleExport = () => {
@@ -727,9 +771,15 @@ export default function Home() {
                       ) : "Apply Pipeline"}
                     </button>
                   )}
+                  {history.length > 0 && operations.length === 0 && (
+                    <button onClick={handleRevert} className="mt-4 w-full py-3 px-4 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-md shadow-sm transition-colors flex justify-center items-center space-x-2">
+                      <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"></path></svg>
+                      <span>Revert Last Pipeline Step</span>
+                    </button>
+                  )}
                   {prevProfile && operations.length === 0 && (
                     <button onClick={handleExport} className="mt-4 w-full py-3 px-4 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-md shadow-sm transition-colors flex justify-center items-center space-x-2">
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                      <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
                       <span>Export Clean Dataset</span>
                     </button>
                   )}

@@ -1,8 +1,8 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException
-from services.file_service import FileService
-from services.profile_service import ProfileService
-from services.clean_service import CleanService
-from models.cleaning import CleanRequest
+from app.services.file_service import FileService
+from app.services.profile_service import ProfileService
+from app.services.clean_service import CleanService
+from app.models.cleaning import CleanRequest
 from typing import Dict, Any
 
 router = APIRouter()

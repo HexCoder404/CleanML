@@ -3,8 +3,8 @@ import os
 import uuid
 from typing import List
 from sklearn.preprocessing import LabelEncoder, StandardScaler, MinMaxScaler
-from models.cleaning import CleanOperation
-from utils.exceptions import ProcessingError
+from app.models.cleaning import CleanOperation
+from app.utils.exceptions import ProcessingError
 
 class CleanService:
     def __init__(self, upload_dir: str = "uploads"):

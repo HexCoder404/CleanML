@@ -2,7 +2,7 @@ import pandas as pd
 import io
 import os
 from fastapi import UploadFile, HTTPException
-from utils.exceptions import ProcessingError
+from app.utils.exceptions import ProcessingError
 
 class FileService:
     def __init__(self, upload_dir: str = "uploads"):
