@@ -5,8 +5,6 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
 } from "recharts";
 
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-
 const INDIGO  = "#6366F1";
 const AMBER   = "#F59E0B";
 const EMERALD = "#10B981";
@@ -131,7 +129,7 @@ export default function VisualizePage() {
     setLoading(true);
     setError(null);
     setVizData(null);
-    fetch(`${API}/api/visualization?file_id=${encodeURIComponent(currentFileId)}`)
+    fetch(`/api/visualization?file_id=${encodeURIComponent(currentFileId)}`)
       .then((r) => { if (!r.ok) throw new Error("Failed to load visualization data"); return r.json(); })
       .then((d) => {
         setVizData(d);
@@ -150,7 +148,7 @@ export default function VisualizePage() {
     const formData = new FormData();
     formData.append("file", file);
     try {
-      const res = await fetch(`${API}/api/dataset/upload`, { method: "POST", body: formData });
+      const res = await fetch(`/api/dataset/upload`, { method: "POST", body: formData });
       if (!res.ok) { const e = await res.json(); throw new Error(e.message || "Upload failed"); }
       const data = await res.json();
       setCurrentFileId(data.file_id);
@@ -180,8 +178,23 @@ export default function VisualizePage() {
       <main className="max-w-7xl mx-auto px-8 py-10 space-y-14">
         <header className="text-center space-y-2">
           <h1 className="text-3xl font-extrabold tracking-tight text-gray-900">Dataset Visualizer</h1>
-          <p className="text-gray-500">Upload a dataset and explore it with ML-focused charts and statistics.</p>
+          <p className="text-gray-500">Explore your ML-ready dataset with automatic charts and actionable statistics.</p>
         </header>
+
+        {currentFileId && (
+          <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between shadow-sm animate-in fade-in slide-in-from-top-4 gap-4">
+            <div className="flex items-center space-x-3">
+              <span className="text-2xl">🔗</span>
+              <div>
+                <p className="font-semibold text-indigo-900">Active Session Linked</p>
+                <p className="text-xs text-indigo-700 mt-0.5">We loaded your dataset directly from the Clean module.</p>
+              </div>
+            </div>
+            <button className="whitespace-nowrap text-sm px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md shadow transition-colors" onClick={() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })}>
+              View Charts ↓
+            </button>
+          </div>
+        )}
 
         {/* Upload Section */}
         <section className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center space-y-6">

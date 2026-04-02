@@ -258,110 +258,132 @@ export default function Home() {
   const qualityScore = calculateQualityScore(profile, totalMissing);
   const prevQualityScore = prevProfile ? calculateQualityScore(prevProfile, prevTotalMissing) : null;
 
+  // Step 1=Upload 2=Review 3=Pipeline built or applied 4=Export ready
+  const currentStep = !profile ? 1 : !prevProfile ? 2 : operations.length > 0 ? 3 : 4;
+
   const isNumericCol = selectedCol && profile?.columns[selectedCol]?.dtype.match(/(int|float|numeric)/i);
 
-  type Suggestion = Omit<CleanOperation, "id"> & { explanation: string, category: 'Cleaning' | 'Engineering' };
+  type SuggestionCategory = 'Cleaning' | 'Engineering' | 'Info';
+  type Suggestion = Omit<CleanOperation, "id"> & {
+    explanation: string;
+    why: string;
+    category: SuggestionCategory;
+    infoOnly?: boolean;
+  };
 
   const getSmartSuggestions = (): Suggestion[] => {
     if (!profile) return [];
-
     const suggestions: Suggestion[] = [];
-    const idPatterns = ["id", "index", "uuid", "key"];
-    const skipEncodePatterns = ["title", "description", "text", "comment", "content", "url", "link", "address"];
-    // High cardinality threshold — above this, label encoding can hurt rather than help
+    const idPatterns = ["id", "index", "uuid", "key", "_id"];
+    const skipEncodePatterns = ["title", "description", "text", "comment", "content", "url", "link", "address", "name"];
     const HIGH_CARDINALITY = 15;
     const totalRows = profile.row_count || 1;
-
     const sortedCols = Object.keys(profile.columns).sort(
       (a, b) => profile.columns[b].null_count - profile.columns[a].null_count
     );
 
-    // 1. Impute missing values
+    // 1. IMPUTE missing values
     sortedCols.forEach((colName) => {
       const lowerCol = colName.toLowerCase();
       if (idPatterns.some((p) => lowerCol.includes(p))) return;
-
       const colInfo = profile.columns[colName];
+      if (colInfo.null_count === 0) return;
+      if (suggestions.filter(s => s.type === 'impute').length >= 5) return;
       const isNum = !!colInfo.dtype.match(/(int|float|numeric)/i);
       const missingPct = ((colInfo.null_count / totalRows) * 100).toFixed(1);
-
-      if (colInfo.null_count > 0 && suggestions.length < 5) {
-        const strategy = isNum ? "median" : "mode";
-        const reason = isNum
-          ? `Median is robust to outliers and preserves the column's distribution better than mean.`
-          : `Mode (most frequent value) is the safest fill for categorical columns.`;
-        suggestions.push({
-          type: "impute",
-          columns: [colName],
-          strategy,
-          explanation: `${colInfo.null_count} missing values (${missingPct}% of rows). ${reason}`,
-          category: 'Cleaning',
-        });
-      }
+      const strategy: any = isNum ? 'median' : 'mode';
+      suggestions.push({
+        type: 'impute', columns: [colName], strategy,
+        explanation: `${colInfo.null_count} missing values (${missingPct}% of rows)`,
+        why: isNum
+          ? `Median is used instead of mean — it is resistant to outliers, so a few extreme values won't skew the fill-in.`
+          : `Mode fills with the most common real value, preserving the natural distribution of the column.`,
+        category: 'Cleaning',
+      });
     });
 
-    // 2. Feature Engineering: Encode
-    // Only suggest encoding for low-cardinality categorical columns.
-    // High-cardinality (> HIGH_CARDINALITY unique values) columns like names or free-text
-    // explode the feature space and rarely benefit from label encoding.
+    // 2. ENCODE low-cardinality categorical columns
+    // Skip high-cardinality, datetime-like, or free-text columns
     let encodeCount = 0;
     Object.keys(profile.columns).forEach((colName) => {
       const lowerCol = colName.toLowerCase();
       if (idPatterns.some((p) => lowerCol.includes(p))) return;
       if (skipEncodePatterns.some((p) => lowerCol.includes(p))) return;
-
+      if (encodeCount >= 2) return;
       const colInfo = profile.columns[colName];
       const isNum = !!colInfo.dtype.match(/(int|float|numeric)/i);
+      if (isNum || colInfo.is_datetime_like) return;
       const uniqueCount = colInfo.unique_count || 0;
-
-      if (!isNum && uniqueCount >= 2 && uniqueCount <= HIGH_CARDINALITY && encodeCount < 2) {
-        const strategy = uniqueCount === 2 ? "label" : "label";
-        const strategyLabel = "Label Encoding";
-        const why = uniqueCount === 2
-          ? `Binary column (${uniqueCount} values) — label encoding maps it to 0/1 which is ideal.`
-          : `Only ${uniqueCount} unique categories — label encoding converts them to integers, keeping the feature space small.`;
-        suggestions.push({
-          type: "encode",
-          columns: [colName],
-          strategy,
-          explanation: why,
-          category: 'Engineering',
-        });
-        encodeCount++;
-      }
+      const cardinalityRatio = colInfo.cardinality_ratio || 0;
+      if (uniqueCount < 2 || uniqueCount > HIGH_CARDINALITY || cardinalityRatio > 0.5) return;
+      suggestions.push({
+        type: 'encode', columns: [colName], strategy: 'label' as any,
+        explanation: `${uniqueCount} unique categories (${(cardinalityRatio * 100).toFixed(1)}% cardinality)`,
+        why: uniqueCount === 2
+          ? `Binary column — label encoding converts to 0/1, exactly what classifiers expect without creating extra columns.`
+          : `Only ${uniqueCount} unique values. Label encoding is safe — small integer space, no explosion of dummy columns.`,
+        category: 'Engineering',
+      });
+      encodeCount++;
     });
 
-    // 3. Feature Engineering: Scale numeric columns
+    // 3. SCALE numeric columns (standard scaler)
     let scaleCount = 0;
     Object.keys(profile.columns).forEach((colName) => {
       const lowerCol = colName.toLowerCase();
       if (idPatterns.some((p) => lowerCol.includes(p))) return;
-
+      if (scaleCount >= 2) return;
       const colInfo = profile.columns[colName];
-      const isNum = !!colInfo.dtype.match(/(int|float|numeric)/i);
+      if (!colInfo.dtype.match(/(int|float|numeric)/i)) return;
+      suggestions.push({
+        type: 'scale', columns: [colName], strategy: 'standard' as any,
+        explanation: `Range: ${colInfo.min?.toFixed(2)} to ${colInfo.max?.toFixed(2)}`,
+        why: `Standardization (Z-score) ensures this column's scale does not dominate models like KNN, SVM, or Logistic Regression that are sensitive to magnitude.`,
+        category: 'Engineering',
+      });
+      scaleCount++;
+    });
 
-      if (isNum && scaleCount < 2) {
-        suggestions.push({
-          type: "scale",
-          columns: [colName],
-          strategy: "standard",
-          explanation: `Standardization (Z-score) centers values around 0 with unit variance — prevents large-range columns from dominating distance-based ML models.`,
-          category: 'Engineering',
-        });
-        scaleCount++;
-      }
+    // 4. INFO: Log-transform for highly skewed numeric columns
+    Object.keys(profile.columns).forEach((colName) => {
+      const lowerCol = colName.toLowerCase();
+      if (idPatterns.some((p) => lowerCol.includes(p))) return;
+      const colInfo = profile.columns[colName];
+      if (!colInfo.dtype.match(/(int|float|numeric)/i)) return;
+      if (colInfo.skewness === null || colInfo.skewness === undefined) return;
+      if (Math.abs(colInfo.skewness) < 1.5) return;
+      suggestions.push({
+        type: 'scale' as any, columns: [colName],
+        explanation: `Skewness: ${colInfo.skewness > 0 ? '+' : ''}${colInfo.skewness?.toFixed(2)}`,
+        why: `Values are heavily skewed (|skew| > 1.5). A log transform before scaling compresses the long tail, which helps linear and tree-based models. Apply manually:\ndf['${colName}'] = np.log1p(df['${colName}'])`,
+        category: 'Info', infoOnly: true,
+      });
+    });
+
+    // 5. INFO: Date/time columns — suggest feature extraction
+    Object.keys(profile.columns).forEach((colName) => {
+      const colInfo = profile.columns[colName];
+      if (!colInfo.is_datetime_like) return;
+      suggestions.push({
+        type: 'drop_columns' as any, columns: [colName],
+        explanation: `Detected as a date/time column`,
+        why: `Raw date strings are meaningless to ML models. Extract useful components instead:\ndf['${colName}_year'] = pd.to_datetime(df['${colName}']).dt.year\ndf['${colName}_month'] = pd.to_datetime(df['${colName}']).dt.month\ndf['${colName}_dayofweek'] = pd.to_datetime(df['${colName}']).dt.dayofweek`,
+        category: 'Info', infoOnly: true,
+      });
     });
 
     return suggestions;
   };
-  
-  // Get suggestions and filter out any that already have an operation applied to their column
-  const smartSuggestions = profile 
-    ? getSmartSuggestions().filter(sugg => !operations.some(op => op.columns?.includes(sugg.columns?.[0] || "")))
-    : [];
 
+  const allSuggestions = profile ? getSmartSuggestions() : [];
+  const actionableSuggestions = allSuggestions
+    .filter(s => !s.infoOnly)
+    .filter(s => !operations.some(op => op.columns?.includes(s.columns?.[0] || '')));
+  const infoSuggestions = allSuggestions.filter(s => s.infoOnly);
+  const smartSuggestions = actionableSuggestions;
   const cleaningSuggestions = smartSuggestions.filter(s => s.category === 'Cleaning');
   const engineeringSuggestions = smartSuggestions.filter(s => s.category === 'Engineering');
+
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 font-sans">
@@ -389,6 +411,35 @@ export default function Home() {
             <h1 className="text-4xl font-extrabold tracking-tight text-gray-900">Get your dataset ML-ready</h1>
             <p className="text-lg text-gray-500">Upload your dataset to profile, clean, and export without writing code.</p>
           </header>
+
+          {/* Step Progress Bar */}
+          <div className="flex items-center justify-center gap-0">
+            {([{n: 1, label: 'Upload', icon: '☁️'}, {n: 2, label: 'Review', icon: '🔍'}, {n: 3, label: 'Clean', icon: '🧹'}, {n: 4, label: 'Export', icon: '📦'}] as const).map(({n, label, icon}, i) => {
+              const done = currentStep > n;
+              const active = currentStep === n;
+              return (
+                <React.Fragment key={n}>
+                  <div className="flex flex-col items-center">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all ${
+                      done ? 'bg-emerald-500 text-white shadow-md shadow-emerald-200' 
+                      : active ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200 ring-4 ring-indigo-100' 
+                      : 'bg-white text-gray-400 border-2 border-gray-200'
+                    }`}>
+                      {done ? '✓' : icon}
+                    </div>
+                    <span className={`mt-1.5 text-xs font-semibold ${
+                      done ? 'text-emerald-600' : active ? 'text-indigo-600' : 'text-gray-400'
+                    }`}>{label}</span>
+                  </div>
+                  {i < 3 && (
+                    <div className={`flex-1 h-0.5 min-w-[40px] max-w-[80px] mx-1 mt-[-20px] transition-all ${
+                      currentStep > n + 1 ? 'bg-emerald-400' : currentStep === n + 1 ? 'bg-indigo-300' : 'bg-gray-200'
+                    }`} />
+                  )}
+                </React.Fragment>
+              );
+            })}
+          </div>
 
         {/* Upload Section */}
         <section className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center space-y-6">
@@ -545,90 +596,104 @@ export default function Home() {
             </section>
 
             {/* Smart Suggestions */}
-            {smartSuggestions.length > 0 && !hasSeenSuggestions && (
+            {(smartSuggestions.length > 0 || infoSuggestions.length > 0) && !hasSeenSuggestions && (
               <section className="bg-gradient-to-r from-indigo-50 to-white rounded-xl shadow-sm border border-indigo-100 overflow-hidden mt-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <div className="px-6 py-4 border-b border-indigo-100 bg-indigo-50/80 flex items-center justify-between">
-                  <h2 className="text-lg font-semibold text-indigo-900 flex items-center space-x-2">
-                    <span>✨ Smart Suggestions</span>
-                  </h2>
+                <div className="px-6 py-4 border-b border-indigo-100 bg-indigo-50/80">
+                  <h2 className="text-lg font-semibold text-indigo-900">✨ Smart Suggestions</h2>
+                  <p className="text-sm text-indigo-700 mt-1">We analyzed your dataset and recommend these changes to get it ML-ready.</p>
                 </div>
-                <div className="p-6">
-                  <p className="text-indigo-800 font-medium mb-6">We analyzed your dataset and found issues. You can add these suggested steps to your pipeline:</p>
-                  
-                  <div className="flex flex-col md:flex-row gap-8">
-                     {/* Category 1: Cleaning */}
-                     {cleaningSuggestions.length > 0 && (
-                        <div className="flex-1 space-y-3">
-                           <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 flex items-center space-x-2">
-                              <span>🧹 Data Cleaning</span>
-                              <div className="h-px bg-gray-200 flex-1"></div>
-                           </h3>
-                           {cleaningSuggestions.map((sugg, idx) => (
-                              <div key={`clean-${idx}`} className="flex flex-col xl:flex-row xl:items-center justify-between bg-white p-4 rounded-lg border border-indigo-50 shadow-sm gap-4">
-                                 <div className="flex items-start space-x-3">
-                                     <div className="mt-1 flex-shrink-0 w-1.5 h-1.5 rounded-full bg-amber-400"></div>
-                                     <div>
-                                         <span className="text-sm font-bold text-gray-900 block mb-1">
-                                              {sugg.type === "impute" && `Impute "${sugg.columns?.[0]}" → ${sugg.strategy === 'median' ? 'Median' : 'Mode'}`}
-                                         </span>
-                                         <span className="text-xs text-gray-500 block leading-tight">{sugg.explanation}</span>
-                                     </div>
-                                 </div>
-                                 <button onClick={() => {
-                                    const { explanation, category, ...cleanOp } = sugg;
-                                    addOperation(cleanOp);
-                                 }} className="shrink-0 py-1.5 px-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold rounded-md border border-indigo-200 transition-colors w-max self-start xl:self-auto">
-                                    Add
-                                 </button>
-                              </div>
-                           ))}
-                        </div>
-                     )}
+                <div className="p-6 space-y-8">
 
-                     {/* Category 2: Feature Engineering */}
-                     {engineeringSuggestions.length > 0 && (
-                        <div className="flex-1 space-y-3">
-                           <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 flex items-center space-x-2">
-                              <span>⚙️ Feature Engineering</span>
-                              <div className="h-px bg-gray-200 flex-1"></div>
-                           </h3>
-                           {engineeringSuggestions.map((sugg, idx) => (
-                              <div key={`eng-${idx}`} className="flex flex-col xl:flex-row xl:items-center justify-between bg-white p-4 rounded-lg border border-indigo-50 shadow-sm gap-4">
-                                 <div className="flex items-start space-x-3">
-                                     <div className="mt-1 flex-shrink-0 w-1.5 h-1.5 rounded-full bg-blue-400"></div>
-                                     <div>
-                                         <span className="text-sm font-bold text-gray-900 block mb-1">
-                                              {sugg.type === "encode" && `Encode "${sugg.columns?.[0]}"`}
-                                              {sugg.type === "scale" && `Scale "${sugg.columns?.[0]}"`}
-                                         </span>
-                                         <span className="text-xs text-gray-500 block leading-tight">{sugg.explanation}</span>
-                                     </div>
-                                 </div>
-                                 <button onClick={() => {
-                                    const { explanation, category, ...cleanOp } = sugg;
-                                    addOperation(cleanOp);
-                                 }} className="shrink-0 py-1.5 px-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold rounded-md border border-indigo-200 transition-colors w-max self-start xl:self-auto">
-                                    Add
-                                 </button>
-                              </div>
-                           ))}
+                  {/* Cleaning Suggestions */}
+                  {cleaningSuggestions.length > 0 && (
+                    <div className="space-y-3">
+                      <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
+                        <span>🧹 Data Cleaning</span><div className="h-px bg-gray-200 flex-1" />
+                      </h3>
+                      {cleaningSuggestions.map((sugg, idx) => (
+                        <div key={`clean-${idx}`} className="flex flex-col sm:flex-row sm:items-start justify-between bg-white p-4 rounded-lg border border-indigo-50 shadow-sm gap-4">
+                          <div className="flex items-start gap-3">
+                            <div className="mt-1.5 shrink-0 w-2 h-2 rounded-full bg-amber-400" />
+                            <div>
+                              <p className="text-sm font-bold text-gray-900 mb-0.5">
+                                Impute &ldquo;{sugg.columns?.[0]}&rdquo; &rarr; {sugg.strategy === 'median' ? 'Median' : 'Mode'}
+                              </p>
+                              <p className="text-xs text-gray-500">{sugg.explanation}</p>
+                              <p className="text-xs text-indigo-600 mt-1 italic">Why: {sugg.why}</p>
+                            </div>
+                          </div>
+                          <button onClick={() => { const { explanation, why, category, infoOnly, ...op } = sugg as any; addOperation(op); }}
+                            className="shrink-0 py-1.5 px-4 bg-indigo-50 hover:bg-indigo-600 hover:text-white text-indigo-700 text-xs font-semibold rounded-md border border-indigo-200 transition-all">
+                            Add to Pipeline
+                          </button>
                         </div>
-                     )}
-                  </div>
-                  
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Engineering Suggestions */}
+                  {engineeringSuggestions.length > 0 && (
+                    <div className="space-y-3">
+                      <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
+                        <span>⚙️ Feature Engineering</span><div className="h-px bg-gray-200 flex-1" />
+                      </h3>
+                      {engineeringSuggestions.map((sugg, idx) => (
+                        <div key={`eng-${idx}`} className="flex flex-col sm:flex-row sm:items-start justify-between bg-white p-4 rounded-lg border border-indigo-50 shadow-sm gap-4">
+                          <div className="flex items-start gap-3">
+                            <div className="mt-1.5 shrink-0 w-2 h-2 rounded-full bg-blue-400" />
+                            <div>
+                              <p className="text-sm font-bold text-gray-900 mb-0.5">
+                                {sugg.type === 'encode' && `Encode "${sugg.columns?.[0]}"`}
+                                {sugg.type === 'scale'  && `Scale "${sugg.columns?.[0]}"`}
+                              </p>
+                              <p className="text-xs text-gray-500">{sugg.explanation}</p>
+                              <p className="text-xs text-indigo-600 mt-1 italic">Why: {sugg.why}</p>
+                            </div>
+                          </div>
+                          <button onClick={() => { const { explanation, why, category, infoOnly, ...op } = sugg as any; addOperation(op); }}
+                            className="shrink-0 py-1.5 px-4 bg-indigo-50 hover:bg-indigo-600 hover:text-white text-indigo-700 text-xs font-semibold rounded-md border border-indigo-200 transition-all">
+                            Add to Pipeline
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Info-only Suggestions */}
+                  {infoSuggestions.length > 0 && (
+                    <div className="space-y-3">
+                      <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
+                        <span>💡 Data Insights</span><div className="h-px bg-gray-200 flex-1" />
+                        <span className="text-[10px] font-normal bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full">Info only</span>
+                      </h3>
+                      {infoSuggestions.map((sugg, idx) => (
+                        <div key={`info-${idx}`} className="bg-teal-50/60 border border-teal-100 rounded-lg p-4 flex items-start gap-3">
+                          <span className="text-teal-500 text-lg shrink-0 mt-0.5">
+                            {sugg.category === 'Info' && sugg.why?.includes('skew') ? '📈' : '📅'}
+                          </span>
+                          <div>
+                            <p className="text-sm font-bold text-teal-900 mb-0.5">
+                              {sugg.why?.includes('skew') ? `High Skew Detected: "${sugg.columns?.[0]}"` : `Date Column: "${sugg.columns?.[0]}"`}
+                            </p>
+                            <p className="text-xs text-teal-700">{sugg.explanation}</p>
+                            <p className="text-xs text-gray-600 mt-1.5 leading-relaxed whitespace-pre-line">{sugg.why}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Apply All Actionable Suggestions */}
                   {smartSuggestions.length > 1 && (
-                     <div className="mt-8 pt-4 border-t border-indigo-100 flex justify-end">
-                        <button onClick={() => {
-                           smartSuggestions.forEach(s => {
-                              const { explanation, category, ...cleanOp } = s;
-                              addOperation(cleanOp);
-                           });
-                           markSuggestionsSeen();
-                        }} className="py-2.5 px-6 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-md shadow-sm transition-all hover:shadow-md flex items-center space-x-2">
-                           <svg className="w-5 h-5 text-indigo-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-                           <span>Apply All Suggestions</span>
-                        </button>
-                     </div>
+                    <div className="pt-4 border-t border-indigo-100 flex justify-end">
+                      <button onClick={() => {
+                        smartSuggestions.forEach(s => { const { explanation, why, category, infoOnly, ...op } = s as any; addOperation(op); });
+                        markSuggestionsSeen();
+                      }} className="py-2.5 px-6 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-md shadow-sm transition-all hover:shadow-md flex items-center gap-2">
+                        <svg className="w-5 h-5 text-indigo-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                        Apply All Suggestions
+                      </button>
+                    </div>
                   )}
                 </div>
               </section>
