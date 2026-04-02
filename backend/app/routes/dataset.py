@@ -76,6 +76,28 @@ async def export_dataset(file_id: str):
         media_type='text/csv'
     )
 
+@router.get("/export/pkl")
+async def export_dataset_pkl(file_id: str):
+    """
+    Exports a parquet file as a pickle (.pkl) file.
+    Useful for loading directly into pandas/sklearn pipelines.
+    """
+    import os
+    from fastapi.responses import FileResponse
+
+    df = file_service.read_parquet(file_id)
+    export_path = file_id.replace(".parquet", "_export.pkl")
+
+    df.to_pickle(export_path)
+
+    filename = os.path.basename(export_path)
+
+    return FileResponse(
+        path=export_path,
+        filename=filename,
+        media_type="application/octet-stream",
+    )
+
 @router.delete("/cleanup")
 async def cleanup_dataset(file_id: str):
     """

@@ -1,14 +1,12 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from app.routes import dataset, visualization
 from app.utils.exceptions import ProcessingError, processing_exception_handler
-from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="CleanML API")
-app.add_exception_handler(ProcessingError, processing_exception_handler)
-app.include_router(dataset.router, prefix="/api/dataset", tags=["Dataset"])
-app.include_router(visualization.router, prefix="/api/visualization", tags=["Visualization"])
 
-# Setup CORS
+# Register CORS first — Starlette applies middleware outermost-last,
+# so this must come before routers to wrap all responses.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -19,6 +17,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.add_exception_handler(ProcessingError, processing_exception_handler)
+app.include_router(dataset.router, prefix="/api/dataset", tags=["Dataset"])
+app.include_router(visualization.router, prefix="/api/visualization", tags=["Visualization"])
 
 @app.get("/")
 def read_root():

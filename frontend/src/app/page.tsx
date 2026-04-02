@@ -1,6 +1,8 @@
 "use client";
 import React, { useState, useEffect, useRef } from "react";
 import { usePipelineStore, CleanOperation } from "../store/pipelineStore";
+import { useToastStore, createToastHelpers } from "../store/toastStore";
+import ToastContainer from "./components/ToastContainer";
 
 export default function Home() {
   const [file, setFile] = useState<File | null>(null);
@@ -10,9 +12,8 @@ export default function Home() {
   const [prevProfile, setPrevProfile] = useState<any>(null); // To store before applying pipeline
   const [loading, setLoading] = useState(false);
   const [cleaning, setCleaning] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const toast = createToastHelpers();
 
   type HistoryStep = {
     fileId: string;
@@ -33,11 +34,27 @@ export default function Home() {
   const [scaleStrategy, setScaleStrategy] = useState<Exclude<CleanOperation["strategy"], undefined>>("standard");
   const [fillValue, setFillValue] = useState<string>("");
 
+  const MAX_FILE_SIZE_MB = 50;
+  const ALLOWED_EXT = [".csv", ".xls", ".xlsx", ".json"];
+
+  const validateFile = (f: File): boolean => {
+    const ext = "." + (f.name.split(".").pop()?.toLowerCase() ?? "");
+    if (!ALLOWED_EXT.includes(ext)) {
+      toast.error(`Wrong format: "${f.name}". Please upload CSV, Excel, or JSON.`);
+      return false;
+    }
+    if (f.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
+      toast.error(`File too large: ${(f.size / 1024 / 1024).toFixed(1)} MB. Max allowed is ${MAX_FILE_SIZE_MB} MB.`);
+      return false;
+    }
+    return true;
+  };
+
   // Memory cleanup tracking
   useEffect(() => {
     const cleanup = () => {
       sessionFiles.current.forEach(id => {
-        fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/dataset/cleanup?file_id=${id}`, {
+        fetch(`/api/dataset/cleanup?file_id=${id}`, {
           method: 'DELETE',
           keepalive: true
         }).catch(err => console.error("Cleanup failed", err));
@@ -52,8 +69,8 @@ export default function Home() {
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      setFile(e.target.files[0]);
-      setError(null);
+      const f = e.target.files[0];
+      if (validateFile(f)) setFile(f);
     }
   };
 
@@ -71,62 +88,59 @@ export default function Home() {
     e.preventDefault();
     setIsDragging(false);
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      setFile(e.dataTransfer.files[0]);
-      setError(null);
+      const f = e.dataTransfer.files[0];
+      if (validateFile(f)) setFile(f);
     }
   };
 
   const handleUpload = async () => {
     if (!file) return;
+    if (!validateFile(file)) return;
     setLoading(true);
-    setError(null);
+
+    // Show backend-sleeping toast if request takes > 3 s
+    let sleepId: string | null = null;
+    const sleepTimer = setTimeout(() => {
+      sleepId = toast.loading("Backend is waking up — this may take a few seconds on first request…");
+    }, 3000);
 
     const formData = new FormData();
     formData.append("file", file);
 
     try {
-      // Clear previous session files to save space
       sessionFiles.current.forEach(id => {
-         fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/dataset/cleanup?file_id=${id}`, { method: 'DELETE' }).catch(e => console.error(e));
+        fetch(`/api/dataset/cleanup?file_id=${id}`, { method: 'DELETE' }).catch(e => console.error(e));
       });
       sessionFiles.current.clear();
       setHistory([]);
 
-      const uploadRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/dataset/upload`, {
-        method: "POST",
-        body: formData,
-      });
-
+      const uploadRes = await fetch(`/api/dataset/upload`, { method: "POST", body: formData });
       if (!uploadRes.ok) {
-        const errData = await uploadRes.json();
-        throw new Error(errData.message || "Failed to upload file");
+        const errData = await uploadRes.json().catch(() => ({}));
+        throw new Error(errData.message || `Upload failed (${uploadRes.status})`);
       }
-
       const uploadData = await uploadRes.json();
       setFileId(uploadData.file_id);
       setCurrentFileId(uploadData.file_id);
       sessionFiles.current.add(uploadData.file_id);
 
-      // Fetch Profile
-      const profileRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/dataset/profile?file_id=${uploadData.file_id}`);
+      const profileRes = await fetch(`/api/dataset/profile?file_id=${uploadData.file_id}`);
       if (!profileRes.ok) throw new Error("Failed to fetch profile");
-      const profileData = await profileRes.json();
-      setProfile(profileData);
-      setPrevProfile(null); // Reset prev
+      setProfile(await profileRes.json());
+      setPrevProfile(null);
 
-      // Fetch Preview
-      const previewRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/dataset/preview?file_id=${uploadData.file_id}&limit=10`);
+      const previewRes = await fetch(`/api/dataset/preview?file_id=${uploadData.file_id}&limit=10`);
       if (!previewRes.ok) throw new Error("Failed to fetch preview");
-      const previewData = await previewRes.json();
-      setPreview(previewData);
-      
-      // Reset pipeline automatically on new upload
+      setPreview(await previewRes.json());
+
       clearOperations();
       resetSuggestions();
-
+      toast.success("Dataset uploaded and profiled successfully!");
     } catch (err: any) {
-      setError(err.message);
+      toast.error(err.message || "Something went wrong. Please try again.");
     } finally {
+      clearTimeout(sleepTimer);
+      if (sleepId) useToastStore.getState().removeToast(sleepId);
       setLoading(false);
     }
   };
@@ -137,8 +151,7 @@ export default function Home() {
 
     // Prevent duplicate operations on the same column
     if (selectedCol && operations.some(op => op.columns?.includes(selectedCol))) {
-      setError(`An operation is already scheduled for column '${selectedCol}'. You can only apply one operation per column per pipeline.`);
-      setTimeout(() => setError(null), 5000);
+      toast.error(`Operation already scheduled for "${selectedCol}". Only one operation per column per pipeline.`, 5000);
       return;
     }
 
@@ -158,51 +171,47 @@ export default function Home() {
   const handleApplyPipeline = async () => {
     if (!fileId || operations.length === 0) return;
     setCleaning(true);
-    setError(null);
+
+    let sleepId: string | null = null;
+    const sleepTimer = setTimeout(() => {
+      sleepId = toast.loading("Processing pipeline — backend is working on it…");
+    }, 3000);
 
     try {
-      const cleanRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/dataset/clean`, {
+      const cleanRes = await fetch(`/api/dataset/clean`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ file_id: fileId, operations }),
       });
-
       if (!cleanRes.ok) {
-        const errData = await cleanRes.json();
+        const errData = await cleanRes.json().catch(() => ({}));
         throw new Error(errData.message || "Failed to clean dataset");
       }
-
       const cleanData = await cleanRes.json();
-      
-      // Save current state to history before updating
+
       if (fileId && profile && preview) {
-        setHistory(prev => [...prev, {
-          fileId,
-          profile,
-          preview,
-          prevProfile
-        }]);
+        setHistory(prev => [...prev, { fileId, profile, preview, prevProfile }]);
       }
-      
-      setFileId(cleanData.file_id); // Update fileId to the newly cleaned parquet
+      setFileId(cleanData.file_id);
       setCurrentFileId(cleanData.file_id);
       sessionFiles.current.add(cleanData.file_id);
-      clearOperations(); // applied
+      clearOperations();
 
-      // Fetch Profile for newly cleaned dataset
-      const profileRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/dataset/profile?file_id=${cleanData.file_id}`);
+      const profileRes = await fetch(`/api/dataset/profile?file_id=${cleanData.file_id}`);
       if (!profileRes.ok) throw new Error("Failed to fetch profile");
-      setPrevProfile(profile); // Save old profile
+      setPrevProfile(profile);
       setProfile(await profileRes.json());
 
-      // Fetch Preview for newly cleaned dataset
-      const previewRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/dataset/preview?file_id=${cleanData.file_id}&limit=10`);
+      const previewRes = await fetch(`/api/dataset/preview?file_id=${cleanData.file_id}&limit=10`);
       if (!previewRes.ok) throw new Error("Failed to fetch preview");
       setPreview(await previewRes.json());
 
+      toast.success("Pipeline applied! Dataset cleaned successfully.");
     } catch (err: any) {
-      setError(err.message);
+      toast.error(err.message || "Pipeline failed. Please try again.");
     } finally {
+      clearTimeout(sleepTimer);
+      if (sleepId) useToastStore.getState().removeToast(sleepId);
       setCleaning(false);
     }
   };
@@ -210,25 +219,24 @@ export default function Home() {
   const handleRevert = () => {
     if (history.length === 0) return;
     const lastStep = history[history.length - 1];
-    
     setFileId(lastStep.fileId);
     setProfile(lastStep.profile);
     setPreview(lastStep.preview);
     setPrevProfile(lastStep.prevProfile);
-    
     setHistory(prev => prev.slice(0, -1));
-    resetSuggestions(); // Restore suggestions per user request
-
-    setSuccessMsg("Reverted to previous step.");
-    setTimeout(() => setSuccessMsg(null), 3000);
+    resetSuggestions();
+    toast.success("Reverted to previous step.");
   };
 
-  const handleExport = () => {
+  const handleExport = (format: "csv" | "pkl" = "csv") => {
     if (!fileId) return;
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-    window.location.href = `${baseUrl}/api/dataset/export?file_id=${fileId}`;
-    setSuccessMsg("Dataset exported successfully!");
-    setTimeout(() => setSuccessMsg(null), 4000);
+    if (format === "pkl") {
+      window.location.href = `/api/dataset/export/pkl?file_id=${fileId}`;
+      toast.success("Pickle file download started!");
+    } else {
+      window.location.href = `/api/dataset/export?file_id=${fileId}`;
+      toast.success("CSV download started!");
+    }
   };
 
   const totalMissing = profile ? Object.values(profile.columns).reduce((acc: number, col: any) => acc + col.null_count, 0) : 0;
@@ -256,76 +264,91 @@ export default function Home() {
 
   const getSmartSuggestions = (): Suggestion[] => {
     if (!profile) return [];
-    
-    const suggestions: Suggestion[] = [];
-    const idPatterns = ["id", "index", "uuid"];
-    const avoidEncodePatterns = ["title", "description", "name", "date", "url"];
 
-    const sortedCols = Object.keys(profile.columns).sort((a, b) => profile.columns[b].null_count - profile.columns[a].null_count);
+    const suggestions: Suggestion[] = [];
+    const idPatterns = ["id", "index", "uuid", "key"];
+    const skipEncodePatterns = ["title", "description", "text", "comment", "content", "url", "link", "address"];
+    // High cardinality threshold — above this, label encoding can hurt rather than help
+    const HIGH_CARDINALITY = 15;
+    const totalRows = profile.row_count || 1;
+
+    const sortedCols = Object.keys(profile.columns).sort(
+      (a, b) => profile.columns[b].null_count - profile.columns[a].null_count
+    );
 
     // 1. Impute missing values
     sortedCols.forEach((colName) => {
       const lowerCol = colName.toLowerCase();
-      if (idPatterns.some((pattern) => lowerCol.includes(pattern))) return;
+      if (idPatterns.some((p) => lowerCol.includes(p))) return;
 
       const colInfo = profile.columns[colName];
-      const isNum = colInfo.dtype.match(/(int|float|numeric)/i);
+      const isNum = !!colInfo.dtype.match(/(int|float|numeric)/i);
+      const missingPct = ((colInfo.null_count / totalRows) * 100).toFixed(1);
 
       if (colInfo.null_count > 0 && suggestions.length < 5) {
+        const strategy = isNum ? "median" : "mode";
+        const reason = isNum
+          ? `Median is robust to outliers and preserves the column's distribution better than mean.`
+          : `Mode (most frequent value) is the safest fill for categorical columns.`;
         suggestions.push({
           type: "impute",
           columns: [colName],
-          strategy: isNum ? "median" : "mode",
-          explanation: `Missing ${colInfo.null_count} values (${colInfo.null_percent}%). Best to fill with ${isNum ? 'median' : 'mode'} to maintain distribution.`,
-          category: 'Cleaning'
+          strategy,
+          explanation: `${colInfo.null_count} missing values (${missingPct}% of rows). ${reason}`,
+          category: 'Cleaning',
         });
       }
     });
 
     // 2. Feature Engineering: Encode
+    // Only suggest encoding for low-cardinality categorical columns.
+    // High-cardinality (> HIGH_CARDINALITY unique values) columns like names or free-text
+    // explode the feature space and rarely benefit from label encoding.
     let encodeCount = 0;
     Object.keys(profile.columns).forEach((colName) => {
       const lowerCol = colName.toLowerCase();
-      if (idPatterns.some((pattern) => lowerCol.includes(pattern))) return;
-      if (avoidEncodePatterns.some((pattern) => lowerCol.includes(pattern))) return;
+      if (idPatterns.some((p) => lowerCol.includes(p))) return;
+      if (skipEncodePatterns.some((p) => lowerCol.includes(p))) return;
 
       const colInfo = profile.columns[colName];
-      const isNum = colInfo.dtype.match(/(int|float|numeric)/i);
-      // Backend guarantees unique_count but fallback to 0 safely on old loads
-      const uniqueCount = colInfo.unique_count || 0; 
+      const isNum = !!colInfo.dtype.match(/(int|float|numeric)/i);
+      const uniqueCount = colInfo.unique_count || 0;
 
-      // Only recommend encoding on non-numeric, with reasonable missing count, avoid suggesting everything
-      // ONLY SUGGEST if unique values < 50 to prevent huge ML feature spaces (like director names)
-      if (!isNum && uniqueCount > 0 && uniqueCount < 50 && encodeCount < 2) {
+      if (!isNum && uniqueCount >= 2 && uniqueCount <= HIGH_CARDINALITY && encodeCount < 2) {
+        const strategy = uniqueCount === 2 ? "label" : "label";
+        const strategyLabel = "Label Encoding";
+        const why = uniqueCount === 2
+          ? `Binary column (${uniqueCount} values) — label encoding maps it to 0/1 which is ideal.`
+          : `Only ${uniqueCount} unique categories — label encoding converts them to integers, keeping the feature space small.`;
         suggestions.push({
           type: "encode",
           columns: [colName],
-          strategy: "label",
-          explanation: `Feature has only ${uniqueCount} unique categories. Label encoding converts this to ML-friendly numbers safely.`,
-          category: 'Engineering'
+          strategy,
+          explanation: why,
+          category: 'Engineering',
         });
         encodeCount++;
       }
     });
 
-    // 3. Feature Engineering: Scale
+    // 3. Feature Engineering: Scale numeric columns
     let scaleCount = 0;
     Object.keys(profile.columns).forEach((colName) => {
       const lowerCol = colName.toLowerCase();
-      if (idPatterns.some((pattern) => lowerCol.includes(pattern))) return;
+      if (idPatterns.some((p) => lowerCol.includes(p))) return;
 
       const colInfo = profile.columns[colName];
-      const isNum = colInfo.dtype.match(/(int|float|numeric)/i);
+      const isNum = !!colInfo.dtype.match(/(int|float|numeric)/i);
 
       if (isNum && scaleCount < 2) {
-         suggestions.push({
-           type: "scale",
-           columns: [colName],
-           strategy: "standard",
-           explanation: 'Numeric values should be scaled (standardized) so ML models do not give them biased weight due to large ranges.',
-           category: 'Engineering'
-         });
-         scaleCount++;
+        suggestions.push({
+          type: "scale",
+          columns: [colName],
+          strategy: "standard",
+          explanation: `Standardization (Z-score) centers values around 0 with unit variance — prevents large-range columns from dominating distance-based ML models.`,
+          category: 'Engineering',
+        });
+        scaleCount++;
       }
     });
 
@@ -342,6 +365,8 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 font-sans">
+      <ToastContainer />
+
       {/* Navbar */}
       <nav className="bg-white border-b border-gray-100 px-8 py-4 flex items-center justify-between sticky top-0 z-10 shadow-sm">
         <div className="flex items-center space-x-3 text-indigo-600">
@@ -359,14 +384,6 @@ export default function Home() {
 
       <main className="p-8">
         <div className="max-w-6xl mx-auto space-y-8 relative">
-
-          {/* Toast Notification */}
-          {successMsg && (
-            <div className="fixed bottom-6 right-6 bg-green-500 text-white px-6 py-3 rounded-xl shadow-lg font-medium flex items-center space-x-3 z-50 animate-in slide-in-from-bottom-5">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
-              <span>{successMsg}</span>
-            </div>
-          )}
 
           <header className="text-center space-y-4 pt-4">
             <h1 className="text-4xl font-extrabold tracking-tight text-gray-900">Get your dataset ML-ready</h1>
@@ -420,8 +437,6 @@ export default function Home() {
               "Generate Profile"
             )}
           </button>
-          
-          {error && <div className="text-red-500 text-sm font-medium p-4 bg-red-50 rounded-lg">{error}</div>}
         </section>
 
         {/* Profile & Preview Section */}
@@ -781,10 +796,24 @@ export default function Home() {
                     </button>
                   )}
                   {prevProfile && operations.length === 0 && (
-                    <button onClick={handleExport} className="mt-4 w-full py-3 px-4 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-md shadow-sm transition-colors flex justify-center items-center space-x-2">
-                      <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-                      <span>Export Clean Dataset</span>
-                    </button>
+                    <div className="mt-4 flex gap-2">
+                      <button
+                        onClick={() => handleExport("csv")}
+                        className="flex-1 py-3 px-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-md shadow-sm transition-colors flex justify-center items-center space-x-2"
+                        title="Download as CSV"
+                      >
+                        <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                        <span>Export CSV</span>
+                      </button>
+                      <button
+                        onClick={() => handleExport("pkl")}
+                        className="flex-1 py-3 px-3 bg-violet-600 hover:bg-violet-700 text-white font-semibold rounded-md shadow-sm transition-colors flex justify-center items-center space-x-2"
+                        title="Download as Pickle (.pkl) — load with pandas.read_pickle()"
+                      >
+                        <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
+                        <span>Export PKL</span>
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>
