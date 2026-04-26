@@ -6,9 +6,13 @@ from sklearn.preprocessing import LabelEncoder, StandardScaler, MinMaxScaler
 from app.models.cleaning import CleanOperation
 from app.utils.exceptions import ProcessingError
 
+_BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+_UPLOADS_DIR = os.path.abspath(os.path.join(_BASE_DIR, "..", "..", "uploads"))
+
 class CleanService:
-    def __init__(self, upload_dir: str = "uploads"):
-        self.upload_dir = upload_dir
+    def __init__(self, upload_dir: str | None = None):
+        self.upload_dir = os.path.abspath(upload_dir or _UPLOADS_DIR)
+        os.makedirs(self.upload_dir, exist_ok=True)
 
     def apply_operations(self, df: pd.DataFrame, operations: List[CleanOperation]) -> pd.DataFrame:
         df_clean = df.copy()

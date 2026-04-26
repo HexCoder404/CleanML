@@ -228,16 +228,39 @@ export default function Home() {
     toast.success("Reverted to previous step.");
   };
 
-  const handleExport = (format: "csv" | "pkl" = "csv") => {
+  const handleExport = async (format: "csv" | "pkl" = "csv") => {
     if (!fileId) return;
-    if (format === "pkl") {
-      window.location.href = `/api/dataset/export/pkl?file_id=${fileId}`;
-      toast.success("Pickle file download started!");
-    } else {
-      window.location.href = `/api/dataset/export?file_id=${fileId}`;
-      toast.success("CSV download started!");
+    const encodedId = encodeURIComponent(fileId);
+    const url = format === "pkl"
+      ? `/api/dataset/export/pkl?file_id=${encodedId}`
+      : `/api/dataset/export?file_id=${encodedId}`;
+
+    try {
+      const res = await fetch(url);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || `Export failed (${res.status})`);
+      }
+      const blob = await res.blob();
+      const disposition = res.headers.get("content-disposition") || "";
+      const nameMatch = disposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+      const filename = nameMatch ? nameMatch[1].replace(/['"]/g, "") : `export.${format}`;
+
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = objectUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(objectUrl);
+
+      toast.success(`${format.toUpperCase()} download started!`);
+    } catch (err: any) {
+      toast.error(err.message || "Export failed. Please try again.");
     }
   };
+
 
   const totalMissing = profile ? Object.values(profile.columns).reduce((acc: number, col: any) => acc + col.null_count, 0) : 0;
   const prevTotalMissing = prevProfile ? Object.values(prevProfile.columns).reduce((acc: number, col: any) => acc + col.null_count, 0) : 0;

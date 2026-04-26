@@ -64,7 +64,7 @@ async def export_dataset(file_id: str):
     from fastapi.responses import FileResponse
     
     df = file_service.read_parquet(file_id)
-    export_path = file_id.replace(".parquet", "_export.csv")
+    export_path = os.path.abspath(file_id.replace(".parquet", "_export.csv"))
     
     df.to_csv(export_path, index=False)
     
@@ -86,7 +86,7 @@ async def export_dataset_pkl(file_id: str):
     from fastapi.responses import FileResponse
 
     df = file_service.read_parquet(file_id)
-    export_path = file_id.replace(".parquet", "_export.pkl")
+    export_path = os.path.abspath(file_id.replace(".parquet", "_export.pkl"))
 
     df.to_pickle(export_path)
 
