@@ -9,17 +9,24 @@ export default function Home() {
   const [fileId, setFileId] = useState<string | null>(null);
   const [preview, setPreview] = useState<any[]>([]);
   const [profile, setProfile] = useState<any>(null);
-  const [prevProfile, setPrevProfile] = useState<any>(null); // To store before applying pipeline
+  const [prevProfile, setPrevProfile] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [cleaning, setCleaning] = useState(false);
   const [autoCleaning, setAutoCleaning] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [showApplied, setShowApplied] = useState(false);
+  const [autoCleanOptions, setAutoCleanOptions] = useState({
+    fillMissing: true,
+    encodeCategories: true,
+    scaleNumeric: true,
+  });
   const [autoCleanResult, setAutoCleanResult] = useState<{
     scoreBefore: number; scoreAfter: number;
     missingBefore: number; missingAfter: number;
     dupsBefore: number; dupsAfter: number;
     rowsBefore: number; rowsAfter: number;
     opsApplied: number;
+    appliedLabels: string[];
   } | null>(null);
   const toast = createToastHelpers();
 
@@ -240,9 +247,15 @@ export default function Home() {
 
   const handleAutoClean = async () => {
     if (!fileId || !profile) return;
-    const suggestions = getSmartSuggestions().filter(s => !s.infoOnly);
+    const allSugg = getSmartSuggestions().filter(s => !s.infoOnly);
+    const suggestions = allSugg.filter(s => {
+      if (s.type === 'impute' && !autoCleanOptions.fillMissing) return false;
+      if (s.type === 'encode' && !autoCleanOptions.encodeCategories) return false;
+      if (s.type === 'scale' && !autoCleanOptions.scaleNumeric) return false;
+      return true;
+    });
     if (suggestions.length === 0) {
-      toast.error("No actionable suggestions found for this dataset.");
+      toast.error("No operations match your selected options.");
       return;
     }
 
@@ -251,6 +264,21 @@ export default function Home() {
     const missingBefore = Object.values(profile.columns).reduce((a: number, c: any) => a + c.null_count, 0) as number;
     const dupsBefore = profile.duplicate_count as number;
     const rowsBefore = profile.row_count as number;
+
+    // Build human-readable labels for each op
+    const buildLabel = (s: any): string => {
+      const col = s.columns?.[0];
+      if (s.type === 'impute') {
+        const strat = s.strategy === 'median' ? 'median' : s.strategy === 'mean' ? 'mean' : s.strategy === 'mode' ? 'mode' : s.strategy;
+        return `Filled "${col}" with ${strat}`;
+      }
+      if (s.type === 'encode') return `Encoded "${col}" (${s.strategy === 'onehot' ? 'one-hot' : 'label'})`;
+      if (s.type === 'scale') return `Scaled "${col}" (${s.strategy === 'minmax' ? 'min-max' : 'standard'})`;
+      if (s.type === 'drop_duplicates') return 'Removed duplicate rows';
+      if (s.type === 'drop_columns') return `Dropped column "${col}"`;
+      return s.type;
+    };
+    const appliedLabels = suggestions.map(buildLabel);
 
     try {
       const ops = suggestions.map(({ explanation, why, category, infoOnly, ...op }: any) => ({
@@ -289,12 +317,14 @@ export default function Home() {
 
       const missingAfter = Object.values(newProfile.columns).reduce((a: number, c: any) => a + c.null_count, 0) as number;
       const scoreAfter = calculateQualityScore(newProfile, missingAfter);
+      setShowApplied(false);
       setAutoCleanResult({
         scoreBefore, scoreAfter,
         missingBefore, missingAfter,
         dupsBefore, dupsAfter: newProfile.duplicate_count,
         rowsBefore, rowsAfter: newProfile.row_count,
         opsApplied: ops.length,
+        appliedLabels,
       });
       toast.success(`Auto Clean applied ${ops.length} operations!`);
     } catch (err: any) {
@@ -694,39 +724,73 @@ export default function Home() {
               </div>
             </section>
 
-            {/* ── Auto Clean ─────────────────────────────────────────── */}
+            {/* ── Auto Clean banner ────────────────────────────────── */}
             {!autoCleanResult && actionableSuggestions.length > 0 && (
-              <section className="bg-gradient-to-r from-violet-600 to-indigo-600 rounded-2xl shadow-lg p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-                <div className="text-white space-y-1">
-                  <h2 className="text-xl font-bold flex items-center gap-2">
-                    <span>⚡ Auto Clean</span>
-                    <span className="text-xs font-semibold bg-white/20 px-2 py-0.5 rounded-full">{actionableSuggestions.length} fixes ready</span>
-                  </h2>
-                  <p className="text-sm text-violet-100">
-                    Let AI pick the best operations and apply them instantly — missing value imputation, encoding, and scaling in one click.
-                  </p>
+              <section className="bg-gradient-to-r from-violet-600 to-indigo-600 rounded-2xl shadow-lg p-6 space-y-4">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div className="text-white space-y-1">
+                    <h2 className="text-xl font-bold flex items-center gap-2">
+                      <span>⚡ Auto Clean</span>
+                      <span className="text-xs font-semibold bg-white/20 px-2 py-0.5 rounded-full">
+                        {[
+                          autoCleanOptions.fillMissing ? actionableSuggestions.filter(s => s.type === 'impute').length : 0,
+                          autoCleanOptions.encodeCategories ? actionableSuggestions.filter(s => s.type === 'encode').length : 0,
+                          autoCleanOptions.scaleNumeric ? actionableSuggestions.filter(s => s.type === 'scale').length : 0,
+                        ].reduce((a, b) => a + b, 0)} fixes ready
+                      </span>
+                    </h2>
+                    <p className="text-sm text-violet-100">
+                      Automatically selects the best cleaning steps for your dataset.
+                    </p>
+                  </div>
+                  <button
+                    id="auto-clean-btn"
+                    onClick={handleAutoClean}
+                    disabled={autoCleaning}
+                    className="shrink-0 flex items-center gap-2 px-6 py-3 bg-white text-violet-700 font-bold rounded-xl shadow-md hover:shadow-xl hover:scale-105 transition-all disabled:opacity-60 disabled:cursor-not-allowed disabled:scale-100 min-w-[160px] justify-center"
+                  >
+                    {autoCleaning ? (
+                      <>
+                        <svg className="animate-spin h-5 w-5 text-violet-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span>Cleaning…</span>
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                        <span>Auto Clean Now</span>
+                      </>
+                    )}
+                  </button>
                 </div>
-                <button
-                  id="auto-clean-btn"
-                  onClick={handleAutoClean}
-                  disabled={autoCleaning}
-                  className="shrink-0 flex items-center gap-2 px-6 py-3 bg-white text-violet-700 font-bold rounded-xl shadow-md hover:shadow-xl hover:scale-105 transition-all disabled:opacity-60 disabled:cursor-not-allowed disabled:scale-100 min-w-[160px] justify-center"
-                >
-                  {autoCleaning ? (
-                    <>
-                      <svg className="animate-spin h-5 w-5 text-violet-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      <span>Cleaning…</span>
-                    </>
-                  ) : (
-                    <>
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-                      <span>Auto Clean Now</span>
-                    </>
-                  )}
-                </button>
+
+                {/* Toggles */}
+                <div className="flex flex-wrap gap-3 pt-1">
+                  {([
+                    { key: 'fillMissing', label: 'Fill Missing Values', icon: '🔧' },
+                    { key: 'encodeCategories', label: 'Encode Categories', icon: '🏷️' },
+                    { key: 'scaleNumeric', label: 'Scale Numeric', icon: '📐' },
+                  ] as const).map(({ key, label, icon }) => (
+                    <button
+                      key={key}
+                      onClick={() => setAutoCleanOptions(prev => ({ ...prev, [key]: !prev[key] }))}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border ${
+                        autoCleanOptions[key]
+                          ? 'bg-white/20 border-white/40 text-white'
+                          : 'bg-white/5 border-white/15 text-violet-200 line-through opacity-60'
+                      }`}
+                    >
+                      <span className={`w-3.5 h-3.5 rounded border flex items-center justify-center text-[9px] shrink-0 ${
+                        autoCleanOptions[key] ? 'bg-white text-violet-700 border-white' : 'border-violet-300'
+                      }`}>
+                        {autoCleanOptions[key] && '✓'}
+                      </span>
+                      {icon} {label}
+                    </button>
+                  ))}
+                </div>
               </section>
             )}
 
@@ -738,13 +802,35 @@ export default function Home() {
                     <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center text-xl">✅</div>
                     <div>
                       <h2 className="font-bold text-lg">Auto Clean Complete</h2>
-                      <p className="text-emerald-100 text-sm">{autoCleanResult.opsApplied} operations applied automatically</p>
+                      <button
+                        onClick={() => setShowApplied(v => !v)}
+                        className="text-emerald-100 text-sm flex items-center gap-1 hover:text-white transition-colors"
+                      >
+                        {autoCleanResult.opsApplied} operations applied
+                        <svg className={`w-3.5 h-3.5 transition-transform ${showApplied ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" /></svg>
+                      </button>
                     </div>
                   </div>
                   <button onClick={() => setAutoCleanResult(null)} className="text-white/60 hover:text-white transition-colors p-1" title="Dismiss">
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
                   </button>
                 </div>
+
+                {/* Expandable applied ops list */}
+                {showApplied && (
+                  <div className="px-6 py-4 border-b border-emerald-100 bg-emerald-50/60">
+                    <p className="text-xs font-bold text-emerald-800 uppercase tracking-wide mb-3">Applied:</p>
+                    <ul className="space-y-1.5">
+                      {autoCleanResult.appliedLabels.map((label, i) => (
+                        <li key={i} className="flex items-center gap-2 text-sm text-emerald-900">
+                          <span className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[10px] font-bold shrink-0">✓</span>
+                          {label}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
                 <div className="p-6 grid grid-cols-2 md:grid-cols-4 gap-4">
                   {/* Quality Score */}
                   <div className="bg-white rounded-xl p-4 border border-emerald-100 shadow-sm text-center">

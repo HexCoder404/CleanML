@@ -15,6 +15,7 @@ const NAV = [
     group: "Clean Page",
     items: [
       { id: "profiling",        label: "Dataset Profiling" },
+      { id: "auto-clean",       label: "⚡ Auto Clean" },
       { id: "smart-suggestions",label: "Smart Suggestions" },
       { id: "pipeline",         label: "Building a Pipeline" },
       { id: "operations",       label: "Operations Reference" },
@@ -41,7 +42,7 @@ const NAV = [
 
 const ON_THIS_PAGE = [
   "What is CleanML?", "Input Formats", "Quick Start",
-  "Dataset Profiling", "Smart Suggestions", "Pipeline Operations",
+  "Dataset Profiling", "Auto Clean", "Smart Suggestions", "Pipeline Operations",
   "Visualize Page", "REST API",
 ];
 
@@ -176,8 +177,8 @@ export default function DocsPage() {
               {[
                 { n: "01", t: "Upload your dataset", d: "Drag & drop or click to select a CSV, Excel, or JSON file on the Clean or Visualize page." },
                 { n: "02", t: "Review the profile", d: "CleanML instantly shows row count, column count, missing values, duplicates, and a Quality Score." },
-                { n: "03", t: "Apply Smart Suggestions", d: "Accept AI-recommended operations or build your own pipeline step-by-step." },
-                { n: "04", t: "Export", d: "Click Export Clean Dataset to download the processed CSV." },
+                { n: "03", t: "Clean Data", d: "Click Auto Clean to instantly apply best practices, or build your own pipeline step-by-step." },
+                { n: "04", t: "Export", d: "Export the cleaned data as CSV or PKL to use in your models." },
               ].map((s) => (
                 <li key={s.n} className="flex gap-4">
                   <span className="flex-shrink-0 w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center justify-center">{s.n}</span>
@@ -219,6 +220,18 @@ export default function DocsPage() {
                 </tbody>
               </table>
             </div>
+          </Section>
+
+          <Section id="auto-clean" title="⚡ Auto Clean">
+            <p className="text-gray-600 leading-relaxed mb-4">
+              If your dataset has obvious data quality issues, CleanML will display an <strong>Auto Clean</strong> banner under the preview table. This feature allows you to instantly apply AI-recommended cleaning steps with a single click.
+            </p>
+            <ul className="list-disc pl-5 mt-3 space-y-2 text-gray-600 text-sm">
+              <li><strong>Toggle Operations:</strong> Before applying, you can toggle specific groups of operations: Fill Missing Values, Encode Categories, and Scale Numeric columns.</li>
+              <li><strong>Improvement Scorecard:</strong> After completion, an improvement card summarizes changes to the Quality Score, Missing Values count, Duplicates, and Row count.</li>
+              <li><strong>Expandable List:</strong> You can click the applied operations link to view the exact list of steps that were executed automatically.</li>
+            </ul>
+            <Note>If you don't like the result, you can use the <strong>Revert Last Pipeline Step</strong> button to restore the data to its previous state.</Note>
           </Section>
 
           <Section id="smart-suggestions" title="Smart Suggestions">
@@ -275,10 +288,13 @@ export default function DocsPage() {
 
           <Section id="export" title="Exporting Results">
             <p className="text-gray-600 leading-relaxed">
-              After applying at least one pipeline, a green <strong>Export Clean Dataset</strong> button appears.
-              Clicking it downloads the processed data as a <Code>.csv</Code> file.
-              The server automatically cleans up temporary parquet files when you close the tab.
+              After applying at least one pipeline or Auto Clean step, export options appear below the pipeline tracker. You can export the clean dataset in two formats:
             </p>
+            <ul className="list-disc pl-5 mt-3 space-y-2 text-gray-600 text-sm">
+              <li><strong>Export CSV:</strong> Downloads the dataset as a standard comma-separated values (<Code>.csv</Code>) file.</li>
+              <li><strong>Export PKL:</strong> Downloads a Python Pickle (<Code>.pkl</Code>) version, which perfectly preserves data types when loaded back into pandas via <Code>pd.read_pickle()</Code>.</li>
+            </ul>
+            <Note>CleanML securely manages file downloads using browser blobs to prevent unneeded page navigation or unintended file cleanup.</Note>
           </Section>
 
           {/* Visualize Page */}
@@ -323,6 +339,7 @@ export default function DocsPage() {
                 { method: "GET",    path: "/api/dataset/preview",   desc: "Returns first N rows as JSON." },
                 { method: "POST",   path: "/api/dataset/clean",     desc: "Apply an ordered list of CleanOperations. Returns new file_id." },
                 { method: "GET",    path: "/api/dataset/export",    desc: "Download the dataset as CSV." },
+                { method: "GET",    path: "/api/dataset/export/pkl",desc: "Download the dataset as PKL." },
                 { method: "DELETE", path: "/api/dataset/cleanup",   desc: "Delete a parquet file from the server." },
                 { method: "GET",    path: "/api/visualization",     desc: "Returns histograms, boxplots, categorical freq, and correlation matrix." },
               ].map((e) => (
