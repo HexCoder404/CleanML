@@ -12,7 +12,15 @@ export default function Home() {
   const [prevProfile, setPrevProfile] = useState<any>(null); // To store before applying pipeline
   const [loading, setLoading] = useState(false);
   const [cleaning, setCleaning] = useState(false);
+  const [autoCleaning, setAutoCleaning] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [autoCleanResult, setAutoCleanResult] = useState<{
+    scoreBefore: number; scoreAfter: number;
+    missingBefore: number; missingAfter: number;
+    dupsBefore: number; dupsAfter: number;
+    rowsBefore: number; rowsAfter: number;
+    opsApplied: number;
+  } | null>(null);
   const toast = createToastHelpers();
 
   type HistoryStep = {
@@ -135,6 +143,7 @@ export default function Home() {
 
       clearOperations();
       resetSuggestions();
+      setAutoCleanResult(null);
       toast.success("Dataset uploaded and profiled successfully!");
     } catch (err: any) {
       toast.error(err.message || "Something went wrong. Please try again.");
@@ -225,7 +234,74 @@ export default function Home() {
     setPrevProfile(lastStep.prevProfile);
     setHistory(prev => prev.slice(0, -1));
     resetSuggestions();
+    setAutoCleanResult(null);
     toast.success("Reverted to previous step.");
+  };
+
+  const handleAutoClean = async () => {
+    if (!fileId || !profile) return;
+    const suggestions = getSmartSuggestions().filter(s => !s.infoOnly);
+    if (suggestions.length === 0) {
+      toast.error("No actionable suggestions found for this dataset.");
+      return;
+    }
+
+    setAutoCleaning(true);
+    const scoreBefore = calculateQualityScore(profile, Object.values(profile.columns).reduce((a: number, c: any) => a + c.null_count, 0) as number);
+    const missingBefore = Object.values(profile.columns).reduce((a: number, c: any) => a + c.null_count, 0) as number;
+    const dupsBefore = profile.duplicate_count as number;
+    const rowsBefore = profile.row_count as number;
+
+    try {
+      const ops = suggestions.map(({ explanation, why, category, infoOnly, ...op }: any) => ({
+        id: Math.random().toString(36).slice(2),
+        ...op,
+      }));
+      const cleanRes = await fetch(`/api/dataset/clean`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ file_id: fileId, operations: ops }),
+      });
+      if (!cleanRes.ok) {
+        const errData = await cleanRes.json().catch(() => ({}));
+        throw new Error(errData.message || "Auto clean failed");
+      }
+      const cleanData = await cleanRes.json();
+
+      if (fileId && profile && preview) {
+        setHistory(prev => [...prev, { fileId, profile, preview, prevProfile }]);
+      }
+      setFileId(cleanData.file_id);
+      setCurrentFileId(cleanData.file_id);
+      sessionFiles.current.add(cleanData.file_id);
+      clearOperations();
+      markSuggestionsSeen();
+
+      const profileRes = await fetch(`/api/dataset/profile?file_id=${cleanData.file_id}`);
+      if (!profileRes.ok) throw new Error("Failed to fetch profile");
+      const newProfile = await profileRes.json();
+      setPrevProfile(profile);
+      setProfile(newProfile);
+
+      const previewRes = await fetch(`/api/dataset/preview?file_id=${cleanData.file_id}&limit=10`);
+      if (!previewRes.ok) throw new Error("Failed to fetch preview");
+      setPreview(await previewRes.json());
+
+      const missingAfter = Object.values(newProfile.columns).reduce((a: number, c: any) => a + c.null_count, 0) as number;
+      const scoreAfter = calculateQualityScore(newProfile, missingAfter);
+      setAutoCleanResult({
+        scoreBefore, scoreAfter,
+        missingBefore, missingAfter,
+        dupsBefore, dupsAfter: newProfile.duplicate_count,
+        rowsBefore, rowsAfter: newProfile.row_count,
+        opsApplied: ops.length,
+      });
+      toast.success(`Auto Clean applied ${ops.length} operations!`);
+    } catch (err: any) {
+      toast.error(err.message || "Auto clean failed. Please try again.");
+    } finally {
+      setAutoCleaning(false);
+    }
   };
 
   const handleExport = async (format: "csv" | "pkl" = "csv") => {
@@ -617,6 +693,110 @@ export default function Home() {
                 </table>
               </div>
             </section>
+
+            {/* ── Auto Clean ─────────────────────────────────────────── */}
+            {!autoCleanResult && actionableSuggestions.length > 0 && (
+              <section className="bg-gradient-to-r from-violet-600 to-indigo-600 rounded-2xl shadow-lg p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="text-white space-y-1">
+                  <h2 className="text-xl font-bold flex items-center gap-2">
+                    <span>⚡ Auto Clean</span>
+                    <span className="text-xs font-semibold bg-white/20 px-2 py-0.5 rounded-full">{actionableSuggestions.length} fixes ready</span>
+                  </h2>
+                  <p className="text-sm text-violet-100">
+                    Let AI pick the best operations and apply them instantly — missing value imputation, encoding, and scaling in one click.
+                  </p>
+                </div>
+                <button
+                  id="auto-clean-btn"
+                  onClick={handleAutoClean}
+                  disabled={autoCleaning}
+                  className="shrink-0 flex items-center gap-2 px-6 py-3 bg-white text-violet-700 font-bold rounded-xl shadow-md hover:shadow-xl hover:scale-105 transition-all disabled:opacity-60 disabled:cursor-not-allowed disabled:scale-100 min-w-[160px] justify-center"
+                >
+                  {autoCleaning ? (
+                    <>
+                      <svg className="animate-spin h-5 w-5 text-violet-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      <span>Cleaning…</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                      <span>Auto Clean Now</span>
+                    </>
+                  )}
+                </button>
+              </section>
+            )}
+
+            {/* ── Auto Clean Improvement Card ─────────────────────────── */}
+            {autoCleanResult && (
+              <section className="rounded-2xl overflow-hidden shadow-lg border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="bg-emerald-600 px-6 py-4 flex items-center justify-between">
+                  <div className="flex items-center gap-3 text-white">
+                    <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center text-xl">✅</div>
+                    <div>
+                      <h2 className="font-bold text-lg">Auto Clean Complete</h2>
+                      <p className="text-emerald-100 text-sm">{autoCleanResult.opsApplied} operations applied automatically</p>
+                    </div>
+                  </div>
+                  <button onClick={() => setAutoCleanResult(null)} className="text-white/60 hover:text-white transition-colors p-1" title="Dismiss">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                  </button>
+                </div>
+                <div className="p-6 grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {/* Quality Score */}
+                  <div className="bg-white rounded-xl p-4 border border-emerald-100 shadow-sm text-center">
+                    <p className="text-xs text-gray-500 font-medium uppercase tracking-wide mb-2">Quality Score</p>
+                    <div className="flex items-center justify-center gap-2">
+                      <span className="text-2xl font-bold text-gray-400 line-through">{autoCleanResult.scoreBefore}</span>
+                      <svg className="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
+                      <span className="text-3xl font-black text-emerald-600">{autoCleanResult.scoreAfter}</span>
+                    </div>
+                    <span className={`mt-1 inline-block text-xs font-bold px-2 py-0.5 rounded-full ${autoCleanResult.scoreAfter > autoCleanResult.scoreBefore ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
+                      {autoCleanResult.scoreAfter > autoCleanResult.scoreBefore ? `+${autoCleanResult.scoreAfter - autoCleanResult.scoreBefore} pts` : 'No change'}
+                    </span>
+                  </div>
+                  {/* Missing Values */}
+                  <div className="bg-white rounded-xl p-4 border border-emerald-100 shadow-sm text-center">
+                    <p className="text-xs text-gray-500 font-medium uppercase tracking-wide mb-2">Missing Values</p>
+                    <div className="flex items-center justify-center gap-2">
+                      <span className="text-2xl font-bold text-red-300 line-through">{autoCleanResult.missingBefore.toLocaleString()}</span>
+                      <svg className="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
+                      <span className="text-3xl font-black text-emerald-600">{autoCleanResult.missingAfter.toLocaleString()}</span>
+                    </div>
+                    <span className="mt-1 inline-block text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
+                      −{(autoCleanResult.missingBefore - autoCleanResult.missingAfter).toLocaleString()} fixed
+                    </span>
+                  </div>
+                  {/* Duplicates */}
+                  <div className="bg-white rounded-xl p-4 border border-emerald-100 shadow-sm text-center">
+                    <p className="text-xs text-gray-500 font-medium uppercase tracking-wide mb-2">Duplicates</p>
+                    <div className="flex items-center justify-center gap-2">
+                      <span className="text-2xl font-bold text-amber-300 line-through">{autoCleanResult.dupsBefore.toLocaleString()}</span>
+                      <svg className="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
+                      <span className="text-3xl font-black text-emerald-600">{autoCleanResult.dupsAfter.toLocaleString()}</span>
+                    </div>
+                    <span className={`mt-1 inline-block text-xs font-bold px-2 py-0.5 rounded-full ${autoCleanResult.dupsBefore > autoCleanResult.dupsAfter ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
+                      {autoCleanResult.dupsBefore > autoCleanResult.dupsAfter ? `−${(autoCleanResult.dupsBefore - autoCleanResult.dupsAfter).toLocaleString()} removed` : 'None removed'}
+                    </span>
+                  </div>
+                  {/* Row Count */}
+                  <div className="bg-white rounded-xl p-4 border border-emerald-100 shadow-sm text-center">
+                    <p className="text-xs text-gray-500 font-medium uppercase tracking-wide mb-2">Rows</p>
+                    <div className="flex items-center justify-center gap-2">
+                      <span className="text-2xl font-bold text-gray-400 line-through">{autoCleanResult.rowsBefore.toLocaleString()}</span>
+                      <svg className="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
+                      <span className="text-3xl font-black text-gray-800">{autoCleanResult.rowsAfter.toLocaleString()}</span>
+                    </div>
+                    <span className={`mt-1 inline-block text-xs font-bold px-2 py-0.5 rounded-full ${autoCleanResult.rowsBefore !== autoCleanResult.rowsAfter ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-500'}`}>
+                      {autoCleanResult.rowsBefore !== autoCleanResult.rowsAfter ? `−${(autoCleanResult.rowsBefore - autoCleanResult.rowsAfter).toLocaleString()} dropped` : 'All preserved'}
+                    </span>
+                  </div>
+                </div>
+              </section>
+            )}
 
             {/* Smart Suggestions */}
             {(smartSuggestions.length > 0 || infoSuggestions.length > 0) && !hasSeenSuggestions && (
