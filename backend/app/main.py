@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routes import dataset, visualization
+from app.routes import dataset, visualization, feedback
 from app.utils.exceptions import ProcessingError, processing_exception_handler
 
 app = FastAPI(title="CleanML API")
@@ -21,7 +21,9 @@ app.add_middleware(
 app.add_exception_handler(ProcessingError, processing_exception_handler)
 app.include_router(dataset.router, prefix="/api/dataset", tags=["Dataset"])
 app.include_router(visualization.router, prefix="/api/visualization", tags=["Visualization"])
+app.include_router(feedback.router, prefix="/api/feedback", tags=["Feedback"])
 
 @app.get("/")
 def read_root():
     return {"message": "Welcome to CleanML API"}
+

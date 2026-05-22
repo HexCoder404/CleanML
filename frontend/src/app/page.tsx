@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useEffect, useRef } from "react";
+import Link from "next/link";
 import { usePipelineStore, CleanOperation } from "../store/pipelineStore";
 import { useToastStore, createToastHelpers } from "../store/toastStore";
 import ToastContainer from "./components/ToastContainer";
@@ -527,9 +528,10 @@ export default function Home() {
           <span className="text-2xl font-extrabold tracking-tight">CleanML</span>
         </div>
         <div className="hidden md:flex space-x-6 text-sm font-medium text-gray-500">
-          <a href="/" className="hover:text-indigo-600 transition-colors font-semibold text-gray-700">Clean</a>
-          <a href="/visualize" className="hover:text-indigo-600 transition-colors">Visualize Data</a>
-          <a href="/docs" target="_blank" className="hover:text-indigo-600 transition-colors">Docs</a>
+          <Link href="/" className="hover:text-indigo-600 hover:border-indigo-600/50 active:text-indigo-600 active:border-indigo-600 transition-all font-semibold text-indigo-600 border-b-2 border-indigo-600 pb-1">Clean</Link>
+          <Link href="/visualize" className="hover:text-indigo-600 hover:border-indigo-600/50 active:text-indigo-600 active:border-indigo-600 transition-all border-b-2 border-transparent pb-1">Visualize Data</Link>
+          <Link href="/feedback" className="hover:text-indigo-600 hover:border-indigo-600/50 active:text-indigo-600 active:border-indigo-600 transition-all border-b-2 border-transparent pb-1">Feedback</Link>
+          <Link href="/docs" className="hover:text-indigo-600 hover:border-indigo-600/50 active:text-indigo-600 active:border-indigo-600 transition-all border-b-2 border-transparent pb-1">Docs</Link>
         </div>
       </nav>
 
