@@ -16,6 +16,7 @@ FEEDBACK_FILE = os.path.join(_UPLOADS_DIR, "feedback.json")
 class FeedbackCreate(BaseModel):
     text: str
     parent_id: Optional[str] = None
+    username: Optional[str] = None
 
 class VotePayload(BaseModel):
     up_delta: int
@@ -115,10 +116,11 @@ async def create_feedback(payload: FeedbackCreate):
             raise HTTPException(status_code=404, detail="Parent comment not found")
             
     new_id = str(uuid.uuid4())
+    username = payload.username.strip() if payload.username and payload.username.strip() else "Anonymous"
     new_item = {
         "id": new_id,
         "parent_id": payload.parent_id,
-        "username": "Anonymous",
+        "username": username,
         "text": payload.text,
         "timestamp": datetime.utcnow().isoformat() + "Z",
         "upvotes": 0,
@@ -132,7 +134,7 @@ async def create_feedback(payload: FeedbackCreate):
     return {
         "id": new_id,
         "parent_id": payload.parent_id,
-        "username": "Anonymous",
+        "username": username,
         "text": payload.text,
         "timestamp": new_item["timestamp"],
         "upvotes": 0,
@@ -180,3 +182,27 @@ async def upvote_feedback(feedback_id: str):
     Deprecated: Endpoint to upvote feedback. Use /vote instead.
     """
     return await vote_feedback(feedback_id, VotePayload(up_delta=1, down_delta=0))
+
+@router.delete("/{feedback_id}")
+async def delete_feedback(feedback_id: str):
+    """
+    Endpoint to delete a comment/reply and all its recursive replies (admin only).
+    """
+    raw_data = load_raw_feedback()
+    
+    ids_to_delete = {feedback_id}
+    added_new = True
+    while added_new:
+        added_new = False
+        for item in raw_data:
+            if item.get("parent_id") in ids_to_delete and item["id"] not in ids_to_delete:
+                ids_to_delete.add(item["id"])
+                added_new = True
+                
+    new_data = [item for item in raw_data if item["id"] not in ids_to_delete]
+    
+    if len(new_data) == len(raw_data):
+        raise HTTPException(status_code=404, detail="Comment not found")
+        
+    save_raw_feedback(new_data)
+    return {"status": "success", "message": "Comment and its replies deleted successfully"}

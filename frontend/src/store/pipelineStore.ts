@@ -12,18 +12,22 @@ interface PipelineState {
   operations: CleanOperation[];
   hasSeenSuggestions: boolean;
   currentFileId: string | null;
+  uploadedFileIds: string[];
   addOperation: (op: Omit<CleanOperation, "id">) => void;
   removeOperation: (id: string) => void;
   clearOperations: () => void;
   markSuggestionsSeen: () => void;
   resetSuggestions: () => void;
   setCurrentFileId: (id: string | null) => void;
+  addUploadedFileId: (id: string) => void;
+  clearUploadedFileIds: () => void;
 }
 
 export const usePipelineStore = create<PipelineState>((set) => ({
   operations: [],
   hasSeenSuggestions: false,
   currentFileId: null,
+  uploadedFileIds: [],
   addOperation: (op) => set((state) => ({ 
     operations: [...state.operations, { ...op, id: Math.random().toString(36).substr(2, 9) }] 
   })),
@@ -34,4 +38,8 @@ export const usePipelineStore = create<PipelineState>((set) => ({
   markSuggestionsSeen: () => set({ hasSeenSuggestions: true }),
   resetSuggestions: () => set({ hasSeenSuggestions: false }),
   setCurrentFileId: (id) => set({ currentFileId: id }),
+  addUploadedFileId: (id) => set((state) => ({
+    uploadedFileIds: [...state.uploadedFileIds, id]
+  })),
+  clearUploadedFileIds: () => set({ uploadedFileIds: [] }),
 }));

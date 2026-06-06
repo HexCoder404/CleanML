@@ -68,12 +68,14 @@ interface CommentNodeProps {
   comment: FeedbackNode;
   onReply: (parentId: string, text: string) => Promise<void>;
   onVote: (id: string, upDelta: number, downDelta: number) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
+  isAdmin: boolean;
   upvotedIds: Set<string>;
   downvotedIds: Set<string>;
   depth: number;
 }
 
-function CommentNode({ comment, onReply, onVote, upvotedIds, downvotedIds, depth }: CommentNodeProps) {
+function CommentNode({ comment, onReply, onVote, onDelete, isAdmin, upvotedIds, downvotedIds, depth }: CommentNodeProps) {
   const [showReplyBox, setShowReplyBox] = useState(false);
   const [showReplies, setShowReplies] = useState(false);
   const [replyText, setReplyText] = useState("");
@@ -211,7 +213,7 @@ function CommentNode({ comment, onReply, onVote, upvotedIds, downvotedIds, depth
               >
                 {showReplyBox ? (
                   <>
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
                     </svg>
                     <span>Cancel</span>
@@ -241,6 +243,24 @@ function CommentNode({ comment, onReply, onVote, upvotedIds, downvotedIds, depth
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                   </svg>
                   <span>{showReplies ? "Hide Replies" : `Show ${replyCount} ${replyCount === 1 ? 'Reply' : 'Replies'}`}</span>
+                </button>
+              )}
+
+              {/* Delete Button (Admin only) */}
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (window.confirm("Are you sure you want to delete this comment and all its replies?")) {
+                      await onDelete(comment.id);
+                    }
+                  }}
+                  className="text-xs font-bold flex items-center space-x-1.5 px-3 py-1.5 rounded-full border border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100 transition-all duration-200"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                  <span>Delete</span>
                 </button>
               )}
             </div>
@@ -315,6 +335,8 @@ function CommentNode({ comment, onReply, onVote, upvotedIds, downvotedIds, depth
               comment={reply} 
               onReply={onReply} 
               onVote={onVote}
+              onDelete={onDelete}
+              isAdmin={isAdmin}
               upvotedIds={upvotedIds}
               downvotedIds={downvotedIds}
               depth={depth + 1} 
@@ -338,10 +360,16 @@ export default function FeedbackPage() {
   const [sortBy, setSortBy] = useState<"upvotes" | "newest">("upvotes");
   const [upvotedIds, setUpvotedIds] = useState<Set<string>>(new Set());
   const [downvotedIds, setDownvotedIds] = useState<Set<string>>(new Set());
+  const [user, setUser] = useState<any>(null);
 
-  // Load upvoted and downvoted comment IDs on mount
+  // Load user details and upvoted/downvoted comment IDs on mount
   useEffect(() => {
     try {
+      const storedUser = localStorage.getItem("cleanml_user");
+      if (storedUser) {
+        setUser(JSON.parse(storedUser));
+      }
+      
       const storedUp = localStorage.getItem("cleanml_upvoted_comments");
       if (storedUp) {
         setUpvotedIds(new Set(JSON.parse(storedUp)));
@@ -351,7 +379,7 @@ export default function FeedbackPage() {
         setDownvotedIds(new Set(JSON.parse(storedDown)));
       }
     } catch (e) {
-      console.error("Failed to load voted IDs:", e);
+      console.error("Failed to load session details:", e);
     }
   }, []);
 
@@ -372,14 +400,44 @@ export default function FeedbackPage() {
     fetchComments();
   }, []);
 
+  const handleDelete = async (id: string) => {
+    try {
+      const res = await fetch(`/api/feedback/${id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        throw new Error("Failed to delete comment");
+      }
+      toast.success("Comment deleted successfully");
+      await fetchComments();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to delete comment.");
+    }
+  };
+
   const handleAddCommentOrReply = async (parentId: string | null, text: string) => {
     if (text.length > 700) {
       throw new Error("Comment exceeds the 700 character limit");
     }
+    
+    // Get username from state or localStorage
+    let currentUsername = "Anonymous";
+    if (user && user.name) {
+      currentUsername = user.name;
+    } else {
+      const stored = localStorage.getItem("cleanml_user");
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          if (parsed && parsed.name) currentUsername = parsed.name;
+        } catch (_) {}
+      }
+    }
+
     const res = await fetch("/api/feedback", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text, parent_id: parentId }),
+      body: JSON.stringify({ text, parent_id: parentId, username: currentUsername }),
     });
 
     if (!res.ok) {
@@ -480,14 +538,14 @@ export default function FeedbackPage() {
 
       {/* Navbar */}
       <nav className="bg-white border-b border-gray-100 px-8 py-4 flex items-center justify-between sticky top-0 z-10 shadow-sm">
-        <div className="flex items-center space-x-3 text-indigo-600">
+        <Link href="/" className="flex items-center space-x-3 text-indigo-600 hover:opacity-90 transition-opacity">
           <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path>
           </svg>
           <span className="text-2xl font-extrabold tracking-tight">CleanML</span>
-        </div>
+        </Link>
         <div className="hidden md:flex space-x-6 text-sm font-medium text-gray-500">
-          <Link href="/" className="hover:text-indigo-600 hover:border-indigo-600/50 active:text-indigo-600 active:border-indigo-600 transition-all border-b-2 border-transparent pb-1">Clean</Link>
+          <Link href="/clean" className="hover:text-indigo-600 hover:border-indigo-600/50 active:text-indigo-600 active:border-indigo-600 transition-all border-b-2 border-transparent pb-1">Clean</Link>
           <Link href="/visualize" className="hover:text-indigo-600 hover:border-indigo-600/50 active:text-indigo-600 active:border-indigo-600 transition-all border-b-2 border-transparent pb-1">Visualize Data</Link>
           <Link href="/feedback" className="hover:text-indigo-600 hover:border-indigo-600/50 active:text-indigo-600 active:border-indigo-600 transition-all font-semibold text-indigo-600 border-b-2 border-indigo-600 pb-1">Feedback</Link>
           <Link href="/docs" className="hover:text-indigo-600 hover:border-indigo-600/50 active:text-indigo-600 active:border-indigo-600 transition-all border-b-2 border-transparent pb-1">Docs</Link>
@@ -669,6 +727,8 @@ export default function FeedbackPage() {
                   comment={comment}
                   onReply={handleAddCommentOrReply}
                   onVote={handleVote}
+                  onDelete={handleDelete}
+                  isAdmin={user?.role === "admin"}
                   upvotedIds={upvotedIds}
                   downvotedIds={downvotedIds}
                   depth={0}

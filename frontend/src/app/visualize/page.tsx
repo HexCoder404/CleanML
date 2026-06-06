@@ -111,7 +111,7 @@ function CorrHeatmap({ cols, data }: { cols: string[]; data: any[] }) {
 }
 
 export default function VisualizePage() {
-  const { currentFileId, setCurrentFileId } = usePipelineStore();
+  const { currentFileId, setCurrentFileId, addUploadedFileId } = usePipelineStore();
 
   const [file, setFile]               = useState<File | null>(null);
   const [isDragging, setIsDragging]   = useState(false);
@@ -153,6 +153,7 @@ export default function VisualizePage() {
       if (!res.ok) { const e = await res.json(); throw new Error(e.message || "Upload failed"); }
       const data = await res.json();
       setCurrentFileId(data.file_id);
+      addUploadedFileId(data.file_id);
     } catch (e: any) {
       setUploadError(e.message);
     } finally {
@@ -163,14 +164,14 @@ export default function VisualizePage() {
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 font-sans">
       <nav className="bg-white border-b border-gray-100 px-8 py-4 flex items-center justify-between sticky top-0 z-10 shadow-sm">
-        <div className="flex items-center space-x-3 text-indigo-600">
+        <Link href="/" className="flex items-center space-x-3 text-indigo-600 hover:opacity-90 transition-opacity">
           <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
           </svg>
           <span className="text-2xl font-extrabold tracking-tight">CleanML</span>
-        </div>
+        </Link>
         <div className="hidden md:flex space-x-6 text-sm font-medium text-gray-500">
-          <Link href="/" className="hover:text-indigo-600 hover:border-indigo-600/50 active:text-indigo-600 active:border-indigo-600 transition-all border-b-2 border-transparent pb-1">Clean</Link>
+          <Link href="/clean" className="hover:text-indigo-600 hover:border-indigo-600/50 active:text-indigo-600 active:border-indigo-600 transition-all border-b-2 border-transparent pb-1">Clean</Link>
           <Link href="/visualize" className="hover:text-indigo-600 hover:border-indigo-600/50 active:text-indigo-600 active:border-indigo-600 transition-all font-semibold text-indigo-600 border-b-2 border-indigo-600 pb-1">Visualize Data</Link>
           <Link href="/feedback" className="hover:text-indigo-600 hover:border-indigo-600/50 active:text-indigo-600 active:border-indigo-600 transition-all border-b-2 border-transparent pb-1">Feedback</Link>
           <Link href="/docs" className="hover:text-indigo-600 hover:border-indigo-600/50 active:text-indigo-600 active:border-indigo-600 transition-all border-b-2 border-transparent pb-1">Docs</Link>
