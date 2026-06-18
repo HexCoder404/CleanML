@@ -39,8 +39,8 @@ class FileService:
             raise ProcessingError(f"Error reading file {filename}: {str(e)}")
 
         # Validate constraints
-        if len(df) > 200000:
-            raise HTTPException(status_code=400, detail="Dataset exceeds 200,000 rows limit.")
+        if len(df) > 150000:
+            raise HTTPException(status_code=400, detail="Dataset exceeds 150,000 rows limit.")
 
         # Save to parquet using an absolute path
         parquet_filename = f"{filename.split('.')[0]}.parquet"

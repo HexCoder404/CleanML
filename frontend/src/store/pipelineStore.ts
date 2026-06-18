@@ -14,6 +14,7 @@ interface PipelineState {
   currentFileId: string | null;
   uploadedFileIds: string[];
   user: any | null;
+  theme: "light" | "dark";
   addOperation: (op: Omit<CleanOperation, "id">) => void;
   removeOperation: (id: string) => void;
   clearOperations: () => void;
@@ -23,6 +24,7 @@ interface PipelineState {
   addUploadedFileId: (id: string) => void;
   clearUploadedFileIds: () => void;
   setUser: (user: any | null) => void;
+  setTheme: (theme: "light" | "dark") => void;
 }
 
 export const usePipelineStore = create<PipelineState>((set) => ({
@@ -31,6 +33,7 @@ export const usePipelineStore = create<PipelineState>((set) => ({
   currentFileId: null,
   uploadedFileIds: [],
   user: null,
+  theme: "dark", // Default to premium dark theme
   addOperation: (op) => set((state) => ({ 
     operations: [...state.operations, { ...op, id: Math.random().toString(36).substr(2, 9) }] 
   })),
@@ -46,4 +49,5 @@ export const usePipelineStore = create<PipelineState>((set) => ({
   })),
   clearUploadedFileIds: () => set({ uploadedFileIds: [] }),
   setUser: (user) => set({ user }),
+  setTheme: (theme) => set({ theme }),
 }));

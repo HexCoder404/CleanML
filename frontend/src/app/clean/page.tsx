@@ -7,6 +7,7 @@ import { useToastStore, createToastHelpers } from "../../store/toastStore";
 import ToastContainer from "../components/ToastContainer";
 import AuthModal from "../components/AuthModal";
 import Navbar from "../components/Navbar";
+import CustomSelect from "../components/CustomSelect";
 
 function CleanAppContent() {
   const searchParams = useSearchParams();
@@ -52,7 +53,7 @@ function CleanAppContent() {
   const [history, setHistory] = useState<HistoryStep[]>([]);
   const sessionFiles = useRef<Set<string>>(new Set());
 
-  const { operations, hasSeenSuggestions, currentFileId, addOperation, removeOperation, clearOperations, markSuggestionsSeen, resetSuggestions, setCurrentFileId, addUploadedFileId, user, setUser } = usePipelineStore();
+  const { operations, hasSeenSuggestions, currentFileId, addOperation, removeOperation, clearOperations, markSuggestionsSeen, resetSuggestions, setCurrentFileId, addUploadedFileId, user, setUser, theme } = usePipelineStore();
   const [opType, setOpType] = useState<CleanOperation["type"]>("drop_duplicates");
   const [selectedCol, setSelectedCol] = useState<string>("");
   
@@ -80,7 +81,7 @@ function CleanAppContent() {
     if (storedUser) {
       setUser(JSON.parse(storedUser));
       setIsDemo(false);
-      toast.success("Successfully authenticated! All CleanML features are now unlocked.");
+      toast.success("Successfully authenticated! All RefineML features are now unlocked.");
       router.replace("/clean");
     }
   };
@@ -514,9 +515,12 @@ function CleanAppContent() {
   const smartSuggestions = actionableSuggestions;
   const cleaningSuggestions = smartSuggestions.filter(s => s.category === 'Cleaning');
   const engineeringSuggestions = smartSuggestions.filter(s => s.category === 'Engineering');
+  const isDark = theme === "dark";
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900 font-sans">
+    <div className={`min-h-screen font-sans transition-colors duration-250 ${
+      isDark ? "bg-zinc-950 text-zinc-300" : "bg-gray-50 text-gray-900"
+    }`}>
       <ToastContainer />
       <AuthModal
         isOpen={isAuthOpen}
@@ -533,11 +537,17 @@ function CleanAppContent() {
 
           {/* Demo Mode Banner */}
           {isDemo && (
-            <div className="bg-gradient-to-r from-violet-600 to-indigo-600 text-white px-6 py-4 rounded-xl shadow-md flex flex-col sm:flex-row items-center justify-between gap-4 animate-in slide-in-from-top duration-300">
+            <div className={`px-6 py-4 rounded-xl shadow-md flex flex-col sm:flex-row items-center justify-between gap-4 animate-in slide-in-from-top duration-300 border ${
+              isDark
+                ? "bg-gradient-to-r from-violet-950/30 to-indigo-950/30 border-violet-900/40 text-violet-300"
+                : "bg-gradient-to-r from-violet-600 to-indigo-600 text-white border-transparent"
+            }`}>
               <div className="flex items-center gap-3">
-                <span className="text-2xl shrink-0">⚡</span>
+                <svg className="w-5 h-5 text-violet-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
                 <span className="text-sm font-semibold">
-                  You are previewing CleanML in <strong>Demo Mode</strong>. Create a free account to unlock Auto Clean, suggestions, and download files.
+                  You are previewing RefineML in <strong>Demo Mode</strong>. Create a free account to unlock Auto Clean, suggestions, and download files.
                 </span>
               </div>
               <button
@@ -546,7 +556,9 @@ function CleanAppContent() {
                   setAuthMode("signup");
                   setIsAuthOpen(true);
                 }}
-                className="px-5 py-2 bg-white text-violet-700 hover:bg-violet-50 font-bold text-xs rounded-xl shadow transition-all shrink-0 hover:scale-105"
+                className={`px-5 py-2 font-bold text-xs rounded-xl shadow transition-all shrink-0 hover:scale-105 cursor-pointer ${
+                  isDark ? "bg-zinc-900 border border-zinc-800 text-violet-400 hover:bg-zinc-800" : "bg-white text-violet-700 hover:bg-violet-50"
+                }`}
               >
                 Sign Up Free
               </button>
@@ -554,32 +566,46 @@ function CleanAppContent() {
           )}
 
           <header className="text-center space-y-4 pt-4">
-            <h1 className="text-4xl font-extrabold tracking-tight text-gray-900">Get your dataset ML-ready</h1>
-            <p className="text-lg text-gray-500">Upload your dataset to profile, clean, and export without writing code.</p>
+            <h1 className={`text-4xl font-extrabold tracking-tight ${
+              isDark ? "text-white" : "text-gray-900"
+            }`}>Get your dataset ML-ready</h1>
+            <p className={`text-lg ${isDark ? "text-neutral-500" : "text-gray-500"}`}>Upload your dataset to profile, clean, and export without writing code.</p>
           </header>
 
           {/* Step Progress Bar */}
           <div className="flex items-center justify-center gap-0">
-            {([{n: 1, label: 'Upload', icon: '☁️'}, {n: 2, label: 'Review', icon: '🔍'}, {n: 3, label: 'Clean', icon: '🧹'}, {n: 4, label: 'Export', icon: '📦'}] as const).map(({n, label, icon}, i) => {
+            {([{n: 1, label: 'Upload'}, {n: 2, label: 'Review'}, {n: 3, label: 'Clean'}, {n: 4, label: 'Export'}] as const).map(({n, label}, i) => {
               const done = currentStep > n;
               const active = currentStep === n;
               return (
                 <React.Fragment key={n}>
                   <div className="flex flex-col items-center">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all ${
-                      done ? 'bg-emerald-500 text-white shadow-md shadow-emerald-200' 
-                      : active ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200 ring-4 ring-indigo-100' 
-                      : 'bg-white text-gray-400 border-2 border-gray-200'
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold border transition-all ${
+                      done
+                        ? isDark
+                          ? 'bg-emerald-600 border-emerald-600 text-white shadow-md'
+                          : 'bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-200' 
+                        : active
+                        ? isDark
+                          ? 'bg-violet-600 border-violet-600 text-white shadow-md ring-4 ring-violet-900/50'
+                          : 'bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-200 ring-4 ring-indigo-100' 
+                        : isDark
+                        ? 'bg-zinc-900 text-zinc-400 border-zinc-800'
+                        : 'bg-white text-gray-400 border-gray-200'
                     }`}>
-                      {done ? '✓' : icon}
+                      {done ? '✓' : n}
                     </div>
                     <span className={`mt-1.5 text-xs font-semibold ${
-                      done ? 'text-emerald-600' : active ? 'text-indigo-600' : 'text-gray-400'
+                      done ? 'text-emerald-600' : active ? 'text-indigo-600' : 'text-neutral-500'
                     }`}>{label}</span>
                   </div>
                   {i < 3 && (
                     <div className={`flex-1 h-0.5 min-w-[40px] max-w-[80px] mx-1 mt-[-20px] transition-all ${
-                      currentStep > n + 1 ? 'bg-emerald-400' : currentStep === n + 1 ? 'bg-indigo-300' : 'bg-gray-200'
+                      currentStep > n + 1
+                        ? 'bg-emerald-505'
+                        : currentStep === n + 1
+                          ? isDark ? 'bg-violet-500' : 'bg-indigo-300'
+                          : isDark ? 'bg-neutral-900' : 'bg-gray-200'
                     }`} />
                   )}
                 </React.Fragment>
@@ -588,7 +614,9 @@ function CleanAppContent() {
           </div>
 
         {/* Upload Section */}
-        <section className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center space-y-6">
+        <section className={`p-8 rounded-2xl border flex flex-col items-center space-y-6 transition-colors ${
+          isDark ? "bg-[#131316] border-neutral-800 shadow-[0_8px_30px_rgb(0,0,0,0.5)]" : "bg-white border-gray-100 shadow-sm"
+        }`}>
           <div className="flex items-center justify-center w-full max-w-xl">
             <label 
               onDragOver={handleDragOver}
@@ -596,23 +624,29 @@ function CleanAppContent() {
               onDrop={handleDrop}
               className={`flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-xl cursor-pointer transition-colors ${
                 isDragging 
-                  ? "border-indigo-500 bg-indigo-100 ring-4 ring-indigo-50" 
-                  : "border-indigo-300 bg-indigo-50 hover:bg-indigo-100"
+                  ? isDark
+                    ? "border-violet-500 bg-violet-900/20 ring-4 ring-violet-900/10"
+                    : "border-indigo-500 bg-indigo-100 ring-4 ring-indigo-50" 
+                  : isDark
+                    ? "border-zinc-800 bg-zinc-900/50 hover:bg-zinc-900/80"
+                    : "border-indigo-300 bg-indigo-50 hover:bg-indigo-100"
               }`}
             >
               <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                <svg className={`w-10 h-10 mb-4 ${isDragging ? "text-indigo-600 animate-bounce" : "text-indigo-500"}`} aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 16">
+                <svg className={`w-10 h-10 mb-4 ${isDragging ? "text-indigo-600 animate-bounce" : "text-indigo-400"}`} aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 16">
                   <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2" />
                 </svg>
-                <p className="mb-2 text-sm text-gray-600"><span className="font-semibold text-indigo-600">Click to upload</span> or drag and drop</p>
-                <p className="text-xs text-gray-500">CSV, Excel, or JSON (MAX. 200k rows)</p>
+                <p className="mb-2 text-sm text-zinc-400"><span className={`font-semibold ${isDark ? "text-violet-400" : "text-indigo-600"}`}>Click to upload</span> or drag and drop</p>
+                <p className="text-xs text-zinc-500">CSV, Excel, or JSON (MAX. 150k rows)</p>
               </div>
               <input type="file" className="hidden" accept=".csv,.xls,.xlsx,.json" onChange={handleFileChange} />
             </label>
           </div>
           
           {file && (
-            <div className="text-sm font-medium text-gray-700 bg-gray-100 px-4 py-2 rounded-lg">
+            <div className={`text-sm font-medium px-4 py-2 rounded-lg border ${
+              isDark ? "bg-zinc-900 text-zinc-300 border-zinc-800" : "bg-gray-100 text-gray-700 border-gray-200"
+            }`}>
               Selected: {file.name}
             </div>
           )}
@@ -620,7 +654,9 @@ function CleanAppContent() {
           <button
             onClick={handleUpload}
             disabled={!file || loading}
-            className="px-8 py-3 text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-full font-semibold transition-all shadow-md hover:shadow-lg focus:ring-4 focus:ring-indigo-300 min-w-[200px] flex justify-center"
+            className={`px-8 py-3 text-white disabled:opacity-50 disabled:cursor-not-allowed rounded-full font-semibold transition-all shadow-md hover:shadow-lg min-w-[200px] flex justify-center cursor-pointer ${
+              isDark ? "bg-violet-600 hover:bg-violet-700" : "bg-indigo-600 hover:bg-indigo-700"
+            }`}
           >
             {loading ? (
               <span className="flex items-center space-x-2">
@@ -638,14 +674,20 @@ function CleanAppContent() {
 
         {/* Profile & Preview Section */}
         {profile && (
-          <div className="space-y-8 animate-in fade-in duration-500">
+          <div className="space-y-8 animate-in fade-in duration-505">
             {/* Stats Cards */}
             <section className="grid grid-cols-1 md:grid-cols-5 gap-6">
 
               {/* Quality Score Card */}
-              <div className="bg-white p-6 rounded-xl shadow-sm border border-emerald-100 relative overflow-hidden bg-gradient-to-br from-white to-emerald-50 col-span-1 md:col-span-2 md:row-span-2 flex flex-col justify-center">
-                 <div className="absolute right-0 top-0 h-full w-2 bg-emerald-400"></div>
-                 <h3 className="text-emerald-800 text-sm font-bold uppercase tracking-wide mb-1 flex items-center space-x-2">
+              <div className={`p-6 rounded-xl border relative overflow-hidden col-span-1 md:col-span-2 md:row-span-2 flex flex-col justify-center transition-all ${
+                isDark
+                  ? "bg-zinc-900 border-zinc-800 bg-gradient-to-br from-zinc-950/20 to-zinc-900/10 shadow-md shadow-black/30"
+                  : "bg-white border-emerald-100 bg-gradient-to-br from-white to-emerald-50"
+              }`}>
+                 <div className="absolute right-0 top-0 h-full w-2 bg-emerald-500"></div>
+                 <h3 className={`text-sm font-bold uppercase tracking-wide mb-1 flex items-center space-x-2 ${
+                   isDark ? "text-emerald-400" : "text-emerald-800"
+                 }`}>
                     <svg className="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"></path></svg>
                     <span>Dataset Quality Score</span>
                  </h3>
@@ -653,54 +695,64 @@ function CleanAppContent() {
                     <p className={`text-6xl font-black ${qualityScore >= 80 ? 'text-emerald-600' : qualityScore >= 50 ? 'text-amber-500' : 'text-red-500'}`}>
                       {qualityScore}
                     </p>
-                    <p className="text-gray-400 font-semibold mb-2">/ 100</p>
+                    <p className="text-zinc-500 font-semibold mb-2">/ 100</p>
                  </div>
                  {prevQualityScore !== null && prevQualityScore !== qualityScore && (
-                    <div className="mt-4 inline-flex items-center space-x-1.5 text-sm font-medium text-emerald-700 bg-emerald-100/50 px-3 py-1 rounded-full w-fit">
+                    <div className={`mt-4 inline-flex items-center space-x-1.5 text-sm font-medium px-3 py-1 rounded-full w-fit ${
+                      isDark ? "bg-emerald-950/20 border border-emerald-900/30 text-emerald-400" : "bg-emerald-100/50 text-emerald-700"
+                    }`}>
                        <span>Score improved from {prevQualityScore}</span>
                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 10l7-7m0 0l7 7m-7-7v18"></path></svg>
                     </div>
                  )}
-                 <p className="text-xs text-gray-500 mt-4 leading-relaxed">
+                 <p className={`text-xs mt-4 leading-relaxed ${isDark ? "text-zinc-500" : "text-gray-500"}`}>
                    Based on missing values ({totalMissing}), duplicates ({profile.duplicate_count}), and data health.
                  </p>
               </div>
 
               {/* Standard Cards */}
-              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 relative overflow-hidden">
+              <div className={`p-6 rounded-xl border relative overflow-hidden transition-all ${
+                isDark ? "bg-zinc-900 border-zinc-800 text-zinc-300 shadow-md shadow-black/20" : "bg-white border-zinc-200"
+              }`}>
                 <div className="absolute right-0 top-0 h-full w-2 bg-indigo-500"></div>
-                <h3 className="text-gray-500 text-sm font-medium">Total Rows</h3>
-                <p className="text-3xl font-bold text-gray-900 mt-2">
+                <h3 className={isDark ? "text-zinc-500 text-sm font-medium" : "text-gray-500 text-sm font-medium"}>Total Rows</h3>
+                <p className={`text-3xl font-bold mt-2 ${isDark ? "text-zinc-100" : "text-gray-900"}`}>
                   {prevProfile && prevProfile.row_count !== profile.row_count && (
-                    <span className="text-gray-400 line-through text-xl mr-2">{prevProfile.row_count.toLocaleString()}</span>
+                    <span className="text-zinc-500 line-through text-xl mr-2">{prevProfile.row_count.toLocaleString()}</span>
                   )}
                   {profile.row_count.toLocaleString()}
                 </p>
               </div>
-              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 relative overflow-hidden">
+              <div className={`p-6 rounded-xl border relative overflow-hidden transition-all ${
+                isDark ? "bg-zinc-900 border-zinc-800 text-zinc-300 shadow-md shadow-black/20" : "bg-white border-zinc-200"
+              }`}>
                 <div className="absolute right-0 top-0 h-full w-2 bg-blue-500"></div>
-                <h3 className="text-gray-500 text-sm font-medium">Total Columns</h3>
-                <p className="text-3xl font-bold text-gray-900 mt-2">
+                <h3 className={isDark ? "text-zinc-500 text-sm font-medium" : "text-gray-500 text-sm font-medium"}>Total Columns</h3>
+                <p className={`text-3xl font-bold mt-2 ${isDark ? "text-zinc-100" : "text-gray-900"}`}>
                   {prevProfile && prevProfile.column_count !== profile.column_count && (
-                    <span className="text-gray-400 line-through text-xl mr-2">{prevProfile.column_count.toLocaleString()}</span>
+                    <span className="text-zinc-500 line-through text-xl mr-2">{prevProfile.column_count.toLocaleString()}</span>
                   )}
                   {profile.column_count.toLocaleString()}
                 </p>
               </div>
-              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 relative overflow-hidden">
+              <div className={`p-6 rounded-xl border relative overflow-hidden transition-all ${
+                isDark ? "bg-zinc-900 border-zinc-800 text-zinc-300 shadow-md shadow-black/20" : "bg-white border-zinc-200"
+              }`}>
                 <div className="absolute right-0 top-0 h-full w-2 bg-amber-500"></div>
-                <h3 className="text-gray-500 text-sm font-medium">Duplicate Rows</h3>
-                <p className="text-3xl font-bold text-gray-900 mt-2">
+                <h3 className={isDark ? "text-zinc-500 text-sm font-medium" : "text-gray-500 text-sm font-medium"}>Duplicate Rows</h3>
+                <p className={`text-3xl font-bold mt-2 ${isDark ? "text-zinc-100" : "text-gray-900"}`}>
                   {prevProfile && prevProfile.duplicate_count !== profile.duplicate_count && (
-                    <span className="text-gray-400 line-through text-xl mr-2">{prevProfile.duplicate_count.toLocaleString()}</span>
+                    <span className="text-zinc-500 line-through text-xl mr-2">{prevProfile.duplicate_count.toLocaleString()}</span>
                   )}
                   {profile.duplicate_count.toLocaleString()}
                 </p>
               </div>
-              <div className="bg-white p-6 rounded-xl shadow-sm border border-red-50 relative overflow-hidden bg-gradient-to-br from-white to-red-50">
+              <div className={`p-6 rounded-xl border relative overflow-hidden transition-all ${
+                isDark ? "bg-zinc-900 border-zinc-800 shadow-md shadow-black/20" : "bg-white border-red-50 bg-gradient-to-br from-white to-red-50"
+              }`}>
                 <div className="absolute right-0 top-0 h-full w-2 bg-red-400"></div>
-                <h3 className="text-gray-600 text-sm font-medium">Missing Values</h3>
-                <p className="text-3xl font-bold text-red-600 mt-2">
+                <h3 className={isDark ? "text-zinc-500 text-sm font-medium" : "text-gray-500 text-sm font-medium"}>Missing Values</h3>
+                <p className="text-3xl font-bold text-red-500 mt-2">
                    {prevProfile && prevTotalMissing !== totalMissing && (
                     <span className="text-red-300 line-through text-xl mr-2">{prevTotalMissing.toLocaleString()}</span>
                   )}
@@ -710,28 +762,44 @@ function CleanAppContent() {
             </section>
 
             {/* Preview Table */}
-            <section className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="px-6 py-4 border-b border-gray-100 bg-gray-50">
-                <h2 className="text-lg font-semibold text-gray-900">Dataset Preview (First 10 Rows)</h2>
+            <section className={`rounded-xl border overflow-hidden transition-colors ${
+              isDark ? "bg-zinc-900 border-zinc-800 shadow-lg" : "bg-white border-zinc-200 shadow-sm"
+            }`}>
+              <div className={`px-6 py-4 border-b transition-colors ${
+                isDark ? "bg-zinc-950/60 border-zinc-800" : "bg-zinc-50 border-zinc-200"
+              }`}>
+                <h2 className={`text-lg font-semibold ${isDark ? "text-white" : "text-gray-900"}`}>Dataset Preview (First 10 Rows)</h2>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm text-left">
-                  <thead className="text-xs text-gray-700 uppercase bg-gray-50">
+                  <thead className={`text-xs uppercase transition-colors ${
+                    isDark ? "bg-zinc-950/40 text-zinc-400" : "bg-gray-50 text-gray-700"
+                  }`}>
                     <tr>
                       {Object.keys(profile.columns).map((colName) => (
                         <th key={colName} className="px-6 py-3 font-medium whitespace-nowrap">
                           {colName}
-                          <span className="block text-[10px] text-gray-400 normal-case mt-1">{profile.columns[colName].dtype}</span>
+                          <span className="block text-[10px] text-zinc-500 normal-case mt-1">{profile.columns[colName].dtype}</span>
                         </th>
                       ))}
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className={`divide-y transition-colors ${
+                    isDark ? "divide-zinc-800" : "divide-gray-100"
+                  }`}>
                     {preview.map((row, idx) => (
-                      <tr key={idx} className="border-b last:border-0 hover:bg-gray-50 transition-colors">
+                      <tr key={idx} className={`transition-colors ${
+                        isDark ? "hover:bg-zinc-950/40 text-zinc-300" : "hover:bg-gray-50 text-gray-600"
+                      }`}>
                         {Object.keys(profile.columns).map((colName) => (
-                          <td key={`${idx}-${colName}`} className="px-6 py-4 whitespace-nowrap text-gray-600 border-r border-gray-100 last:border-0 truncate max-w-[200px]">
-                            {row[colName] !== null && row[colName] !== "" ? String(row[colName]) : <span className="text-red-400 italic bg-red-50 px-2 py-1 rounded text-xs">null</span>}
+                          <td key={`${idx}-${colName}`} className={`px-6 py-4 whitespace-nowrap border-r last:border-0 truncate max-w-[200px] ${
+                            isDark ? "border-zinc-800/40" : "border-gray-100"
+                          }`}>
+                            {row[colName] !== null && row[colName] !== "" ? String(row[colName]) : (
+                              <span className={`px-2 py-0.5 rounded text-xs italic ${
+                                isDark ? "bg-rose-950/20 border border-rose-900/30 text-rose-400" : "bg-red-50 text-red-500"
+                              }`}>null</span>
+                            )}
                           </td>
                         ))}
                       </tr>
@@ -743,12 +811,18 @@ function CleanAppContent() {
 
             {/* Auto Clean banner */}
             {!autoCleanResult && actionableSuggestions.length > 0 && (
-              <section className="bg-gradient-to-r from-violet-600 to-indigo-600 rounded-2xl shadow-lg p-6 space-y-4">
+              <section className={`rounded-2xl shadow-lg p-6 space-y-4 border transition-colors ${
+                isDark
+                  ? "bg-zinc-900 border-zinc-800 text-zinc-300 shadow-lg shadow-black/20"
+                  : "bg-gradient-to-r from-violet-600 to-indigo-600 text-white border-transparent"
+              }`}>
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                  <div className="text-white space-y-1">
+                  <div className="space-y-1">
                     <h2 className="text-xl font-bold flex items-center gap-2">
-                      <span>⚡ Auto Clean</span>
-                      <span className="text-xs font-semibold bg-white/20 px-2 py-0.5 rounded-full">
+                      <span>Auto Clean</span>
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                        isDark ? "bg-zinc-950 border border-zinc-800 text-violet-400" : "bg-white/20 text-white"
+                      }`}>
                         {[
                           autoCleanOptions.fillMissing ? actionableSuggestions.filter(s => s.type === 'impute').length : 0,
                           autoCleanOptions.encodeCategories ? actionableSuggestions.filter(s => s.type === 'encode').length : 0,
@@ -756,7 +830,7 @@ function CleanAppContent() {
                         ].reduce((a, b) => a + b, 0)} fixes ready
                       </span>
                     </h2>
-                    <p className="text-sm text-violet-100">
+                    <p className={`text-sm ${isDark ? "text-zinc-500" : "text-violet-100"}`}>
                       Automatically selects and schedules the best cleaning steps.
                     </p>
                   </div>
@@ -772,16 +846,24 @@ function CleanAppContent() {
                       handleAutoClean();
                     }}
                     disabled={autoCleaning}
-                    className="shrink-0 flex items-center gap-2 px-6 py-3 bg-white text-violet-700 font-bold rounded-xl shadow-md hover:shadow-xl hover:scale-105 transition-all disabled:opacity-60 disabled:cursor-not-allowed disabled:scale-100 min-w-[160px] justify-center"
+                    className={`shrink-0 flex items-center gap-2 px-6 py-3 font-bold rounded-xl shadow-md hover:shadow-xl hover:scale-105 transition-all disabled:opacity-60 disabled:cursor-not-allowed disabled:scale-100 min-w-[160px] justify-center cursor-pointer ${
+                      isDark
+                        ? "bg-violet-600 hover:bg-violet-700 text-white"
+                        : "bg-white text-violet-700 hover:bg-violet-50"
+                    }`}
                   >
                     {autoCleaning ? (
                       <>
-                        <svg className="animate-spin h-5 w-5 text-violet-655" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/></svg>
+                        <svg className="animate-spin h-5 w-5 text-violet-500" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/></svg>
                         <span>Cleaning…</span>
                       </>
                     ) : (
                       <>
-                        <span className="text-xs">{isDemo ? "🔒" : "⚡"}</span>
+                        {isDemo && (
+                          <svg className="w-3.5 h-3.5 text-current shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                          </svg>
+                        )}
                         <span>Auto Clean Now</span>
                       </>
                     )}
@@ -791,61 +873,76 @@ function CleanAppContent() {
                 {/* Toggles */}
                 <div className="flex flex-wrap gap-3 pt-1">
                   {([
-                    { key: 'fillMissing', label: 'Fill Missing Values', icon: '🔧' },
-                    { key: 'encodeCategories', label: 'Encode Categories', icon: '🏷️' },
-                    { key: 'scaleNumeric', label: 'Scale Numeric', icon: '📐' },
-                  ] as const).map(({ key, label, icon }) => (
+                    { key: 'fillMissing', label: 'Fill Missing Values' },
+                    { key: 'encodeCategories', label: 'Encode Categories' },
+                    { key: 'scaleNumeric', label: 'Scale Numeric' },
+                  ] as const).map(({ key, label }) => (
                     <button
                       key={key}
                       onClick={() => setAutoCleanOptions(prev => ({ ...prev, [key]: !prev[key] }))}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border ${
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border cursor-pointer ${
                         autoCleanOptions[key]
-                          ? 'bg-white/20 border-white/40 text-white'
-                          : 'bg-white/5 border-white/15 text-violet-200 line-through opacity-60'
+                          ? isDark
+                            ? 'bg-violet-900/45 border-violet-900 text-violet-400'
+                            : 'bg-white/20 border-white/40 text-white'
+                          : isDark
+                            ? 'bg-zinc-950 border-zinc-800 text-zinc-500 line-through opacity-60'
+                            : 'bg-white/5 border-white/15 text-violet-200 line-through opacity-60'
                       }`}
                     >
                       <span className={`w-3.5 h-3.5 rounded border flex items-center justify-center text-[9px] shrink-0 ${
-                        autoCleanOptions[key] ? 'bg-white text-violet-700 border-white' : 'border-violet-300'
+                        autoCleanOptions[key]
+                          ? isDark ? 'bg-violet-600 border-violet-600 text-white' : 'bg-white text-violet-700 border-white'
+                          : 'border-violet-300'
                       }`}>
                         {autoCleanOptions[key] && '✓'}
                       </span>
-                      {icon} {label}
+                      {label}
                     </button>
                   ))}
                 </div>
               </section>
             )}
-
             {/* Auto Clean Improvement Card */}
             {autoCleanResult && (
-              <section className="rounded-2xl overflow-hidden shadow-lg border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <div className="bg-emerald-600 px-6 py-4 flex items-center justify-between">
+              <section className={`rounded-2xl overflow-hidden shadow-lg border transition-all animate-in fade-in slide-in-from-bottom-4 duration-500 ${
+                isDark ? "bg-zinc-900 border-zinc-800 shadow-lg" : "bg-gradient-to-br from-emerald-50 to-white border-emerald-200"
+              }`}>
+                <div className={`px-6 py-4 flex items-center justify-between ${
+                  isDark ? "bg-emerald-950/60 border-b border-emerald-900" : "bg-emerald-600"
+                }`}>
                   <div className="flex items-center gap-3 text-white">
-                    <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center text-xl">✅</div>
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center border text-white ${isDark ? "bg-emerald-900/20 border-emerald-800" : "bg-white/20 border-transparent"}`}>
+                      <svg className="w-5 h-5 text-white shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
                     <div>
-                      <h2 className="font-bold text-lg">Auto Clean Complete</h2>
+                      <h2 className="font-bold text-lg text-white">Auto Clean Complete</h2>
                       <button
                         onClick={() => setShowApplied(v => !v)}
-                        className="text-emerald-100 text-sm flex items-center gap-1 hover:text-white transition-colors"
+                        className={`text-sm flex items-center gap-1 transition-colors cursor-pointer ${
+                          isDark ? "text-emerald-400 hover:text-emerald-300" : "text-emerald-100 hover:text-white"
+                        }`}
                       >
                         {autoCleanResult.opsApplied} operations applied
                         <svg className={`w-3.5 h-3.5 transition-transform ${showApplied ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" /></svg>
                       </button>
                     </div>
                   </div>
-                  <button onClick={() => setAutoCleanResult(null)} className="text-white/60 hover:text-white transition-colors p-1" title="Dismiss">
+                  <button onClick={() => setAutoCleanResult(null)} className="text-white/60 hover:text-white transition-colors p-1 cursor-pointer" title="Dismiss">
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
                   </button>
                 </div>
 
                 {showApplied && (
-                  <div className="px-6 py-4 border-b border-emerald-100 bg-emerald-50/60">
-                    <p className="text-xs font-bold text-emerald-800 uppercase tracking-wide mb-3">Applied:</p>
+                  <div className={`px-6 py-4 border-b ${isDark ? "border-zinc-800 bg-zinc-950/10" : "border-emerald-100 bg-emerald-50/60"}`}>
+                    <p className={`text-xs font-bold uppercase tracking-wide mb-3 ${isDark ? "text-emerald-400" : "text-emerald-800"}`}>Applied:</p>
                     <ul className="space-y-1.5">
                       {autoCleanResult.appliedLabels.map((label, i) => (
-                        <li key={i} className="flex items-center gap-2 text-sm text-emerald-900">
+                        <li key={i} className="flex items-center gap-2 text-sm">
                           <span className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[10px] font-bold shrink-0">✓</span>
-                          {label}
+                          <span className={isDark ? "text-zinc-300" : "text-emerald-900"}>{label}</span>
                         </li>
                       ))}
                     </ul>
@@ -853,47 +950,55 @@ function CleanAppContent() {
                 )}
 
                 <div className="p-6 grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="bg-white rounded-xl p-4 border border-emerald-100 shadow-sm text-center">
-                    <p className="text-xs text-gray-500 font-medium uppercase tracking-wide mb-2">Quality Score</p>
+                  <div className={`rounded-xl p-4 border shadow-sm text-center transition-colors ${
+                    isDark ? "bg-zinc-950/40 border-zinc-800" : "bg-white border-emerald-100"
+                  }`}>
+                    <p className="text-xs text-neutral-500 font-medium uppercase tracking-wide mb-2">Quality Score</p>
                     <div className="flex items-center justify-center gap-2">
-                      <span className="text-2xl font-bold text-gray-400 line-through">{autoCleanResult.scoreBefore}</span>
+                      <span className="text-2xl font-bold text-neutral-500 line-through">{autoCleanResult.scoreBefore}</span>
                       <svg className="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
                       <span className="text-3xl font-black text-emerald-600">{autoCleanResult.scoreAfter}</span>
                     </div>
-                    <span className={`mt-1 inline-block text-xs font-bold px-2 py-0.5 rounded-full ${autoCleanResult.scoreAfter > autoCleanResult.scoreBefore ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
+                    <span className={`mt-1 inline-block text-xs font-bold px-2 py-0.5 rounded-full ${autoCleanResult.scoreAfter > autoCleanResult.scoreBefore ? 'bg-emerald-950/30 text-emerald-400 border border-emerald-900/40' : 'bg-zinc-950 text-zinc-500'}`}>
                       {autoCleanResult.scoreAfter > autoCleanResult.scoreBefore ? `+${autoCleanResult.scoreAfter - autoCleanResult.scoreBefore} pts` : 'No change'}
                     </span>
                   </div>
-                  <div className="bg-white rounded-xl p-4 border border-emerald-100 shadow-sm text-center">
-                    <p className="text-xs text-gray-500 font-medium uppercase tracking-wide mb-2">Missing Values</p>
+                  <div className={`rounded-xl p-4 border shadow-sm text-center transition-colors ${
+                    isDark ? "bg-zinc-950/40 border-zinc-800" : "bg-white border-emerald-100"
+                  }`}>
+                    <p className="text-xs text-neutral-500 font-medium uppercase tracking-wide mb-2">Missing Values</p>
                     <div className="flex items-center justify-center gap-2">
                       <span className="text-2xl font-bold text-red-300 line-through">{autoCleanResult.missingBefore.toLocaleString()}</span>
                       <svg className="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
                       <span className="text-3xl font-black text-emerald-600">{autoCleanResult.missingAfter.toLocaleString()}</span>
                     </div>
-                    <span className="mt-1 inline-block text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
+                    <span className="mt-1 inline-block text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-950/35 text-emerald-400 border border-emerald-900/40">
                       −{(autoCleanResult.missingBefore - autoCleanResult.missingAfter).toLocaleString()} fixed
                     </span>
                   </div>
-                  <div className="bg-white rounded-xl p-4 border border-emerald-100 shadow-sm text-center">
-                    <p className="text-xs text-gray-500 font-medium uppercase tracking-wide mb-2">Duplicates</p>
+                  <div className={`rounded-xl p-4 border shadow-sm text-center transition-colors ${
+                    isDark ? "bg-zinc-950/40 border-zinc-800" : "bg-white border-emerald-100"
+                  }`}>
+                    <p className="text-xs text-neutral-500 font-medium uppercase tracking-wide mb-2">Duplicates</p>
                     <div className="flex items-center justify-center gap-2">
                       <span className="text-2xl font-bold text-amber-300 line-through">{autoCleanResult.dupsBefore.toLocaleString()}</span>
                       <svg className="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
                       <span className="text-3xl font-black text-emerald-600">{autoCleanResult.dupsAfter.toLocaleString()}</span>
                     </div>
-                    <span className={`mt-1 inline-block text-xs font-bold px-2 py-0.5 rounded-full ${autoCleanResult.dupsBefore > autoCleanResult.dupsAfter ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
+                    <span className={`mt-1 inline-block text-xs font-bold px-2 py-0.5 rounded-full ${autoCleanResult.dupsBefore > autoCleanResult.dupsAfter ? 'bg-emerald-950/35 text-emerald-400 border border-emerald-900/40' : 'bg-zinc-950 text-zinc-500'}`}>
                       {autoCleanResult.dupsBefore > autoCleanResult.dupsAfter ? `−${(autoCleanResult.dupsBefore - autoCleanResult.dupsAfter).toLocaleString()} removed` : 'None removed'}
                     </span>
                   </div>
-                  <div className="bg-white rounded-xl p-4 border border-emerald-100 shadow-sm text-center">
-                    <p className="text-xs text-gray-500 font-medium uppercase tracking-wide mb-2">Rows</p>
+                  <div className={`rounded-xl p-4 border shadow-sm text-center transition-colors ${
+                    isDark ? "bg-zinc-950/40 border-zinc-800" : "bg-white border-emerald-100"
+                  }`}>
+                    <p className="text-xs text-neutral-500 font-medium uppercase tracking-wide mb-2">Rows</p>
                     <div className="flex items-center justify-center gap-2">
-                      <span className="text-2xl font-bold text-gray-400 line-through">{autoCleanResult.rowsBefore.toLocaleString()}</span>
+                      <span className="text-2xl font-bold text-neutral-500 line-through">{autoCleanResult.rowsBefore.toLocaleString()}</span>
                       <svg className="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
-                      <span className="text-3xl font-black text-gray-800">{autoCleanResult.rowsAfter.toLocaleString()}</span>
+                      <span className={`text-3xl font-black ${isDark ? "text-neutral-100" : "text-gray-800"}`}>{autoCleanResult.rowsAfter.toLocaleString()}</span>
                     </div>
-                    <span className={`mt-1 inline-block text-xs font-bold px-2 py-0.5 rounded-full ${autoCleanResult.rowsBefore !== autoCleanResult.rowsAfter ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-500'}`}>
+                    <span className={`mt-1 inline-block text-xs font-bold px-2 py-0.5 rounded-full ${autoCleanResult.rowsBefore !== autoCleanResult.rowsAfter ? 'bg-amber-950/35 text-amber-400 border border-amber-900/40' : 'bg-gray-100 text-gray-500'}`}>
                       {autoCleanResult.rowsBefore !== autoCleanResult.rowsAfter ? `−${(autoCleanResult.rowsBefore - autoCleanResult.rowsAfter).toLocaleString()} dropped` : 'All preserved'}
                     </span>
                   </div>
@@ -903,29 +1008,33 @@ function CleanAppContent() {
 
             {/* Smart Suggestions */}
             {(smartSuggestions.length > 0 || infoSuggestions.length > 0) && !hasSeenSuggestions && (
-              <section className="bg-gradient-to-r from-indigo-50 to-white rounded-xl shadow-sm border border-indigo-100 overflow-hidden mt-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <div className="px-6 py-4 border-b border-indigo-100 bg-indigo-50/80">
-                  <h2 className="text-lg font-semibold text-indigo-900">✨ Smart Preprocessing Suggestions</h2>
-                  <p className="text-sm text-indigo-700 mt-1">We analyzed your dataset and recommend these changes to get it ML-ready.</p>
+              <section className={`rounded-xl border overflow-hidden mt-8 transition-colors ${
+                isDark ? "bg-zinc-900 border-zinc-800 shadow-[0_8px_30px_rgb(0,0,0,0.5)]" : "bg-gradient-to-r from-indigo-50 to-white border-indigo-100 shadow-sm"
+              }`}>
+                <div className={`px-6 py-4 border-b ${isDark ? "bg-zinc-950/40 border-zinc-800" : "bg-indigo-50/80"}`}>
+                  <h2 className={`text-lg font-semibold ${isDark ? "text-neutral-100" : "text-indigo-900"}`}>Smart Preprocessing Suggestions</h2>
+                  <p className={`text-sm mt-1 ${isDark ? "text-zinc-400" : "text-indigo-700"}`}>We analyzed your dataset and recommend these changes to get it ML-ready.</p>
                 </div>
                 <div className="p-6 space-y-8">
 
                   {/* Cleaning Suggestions */}
                   {cleaningSuggestions.length > 0 && (
                     <div className="space-y-3">
-                      <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
-                        <span>🧹 Data Cleaning</span><div className="h-px bg-gray-200 flex-1" />
+                      <h3 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-2 ${isDark ? "text-zinc-500" : "text-gray-400"}`}>
+                        <span>Data Cleaning</span><div className={`h-px flex-1 ${isDark ? "bg-zinc-800" : "bg-gray-200"}`} />
                       </h3>
                       {cleaningSuggestions.map((sugg, idx) => (
-                        <div key={`clean-${idx}`} className="flex flex-col sm:flex-row sm:items-start justify-between bg-white p-4 rounded-lg border border-indigo-50 shadow-sm gap-4">
+                        <div key={`clean-${idx}`} className={`flex flex-col sm:flex-row sm:items-start justify-between p-4 rounded-lg border shadow-sm gap-4 transition-colors ${
+                          isDark ? "bg-zinc-950/20 border-zinc-800" : "bg-white border-indigo-50"
+                        }`}>
                           <div className="flex items-start gap-3">
                             <div className="mt-1.5 shrink-0 w-2 h-2 rounded-full bg-amber-400" />
                             <div>
-                              <p className="text-sm font-bold text-gray-900 mb-0.5">
+                              <p className={`text-sm font-bold mb-0.5 ${isDark ? "text-zinc-200" : "text-gray-900"}`}>
                                 Impute &ldquo;{sugg.columns?.[0]}&rdquo; &rarr; {sugg.strategy === 'median' ? 'Median' : 'Mode'}
                               </p>
-                              <p className="text-xs text-gray-500">{sugg.explanation}</p>
-                              <p className="text-xs text-indigo-600 mt-1 italic font-medium">Why: {sugg.why}</p>
+                              <p className={`text-xs ${isDark ? "text-zinc-400" : "text-gray-500"}`}>{sugg.explanation}</p>
+                              <p className="text-xs text-indigo-500 mt-1 italic font-medium">Why: {sugg.why}</p>
                             </div>
                           </div>
                           <button onClick={() => {
@@ -938,8 +1047,16 @@ function CleanAppContent() {
                             const { explanation, why, category, infoOnly, ...op } = sugg as any;
                             addOperation(op);
                           }}
-                            className="shrink-0 py-1.5 px-4 bg-indigo-55 hover:bg-indigo-600 hover:text-white text-indigo-700 text-xs font-bold rounded-md border border-indigo-200 transition-all flex items-center gap-1">
-                            {isDemo && <span className="text-[10px]">🔒</span>}
+                            className={`shrink-0 py-1.5 px-4 text-xs font-bold rounded-md border transition-all flex items-center gap-1 cursor-pointer ${
+                              isDark
+                                ? "bg-violet-950/30 border-violet-900/60 text-violet-400 hover:bg-violet-900/40 hover:text-white"
+                                : "bg-indigo-50 hover:bg-indigo-600 hover:text-white text-indigo-700 border-indigo-200"
+                            }`}>
+                            {isDemo && (
+                              <svg className="w-3.5 h-3.5 text-current shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                              </svg>
+                            )}
                             Add to Pipeline
                           </button>
                         </div>
@@ -950,20 +1067,22 @@ function CleanAppContent() {
                   {/* Engineering Suggestions */}
                   {engineeringSuggestions.length > 0 && (
                     <div className="space-y-3">
-                      <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
-                        <span>⚙️ Feature Engineering</span><div className="h-px bg-gray-200 flex-1" />
+                      <h3 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-2 ${isDark ? "text-zinc-500" : "text-gray-400"}`}>
+                        <span>Feature Engineering</span><div className={`h-px flex-1 ${isDark ? "bg-zinc-800" : "bg-gray-200"}`} />
                       </h3>
                       {engineeringSuggestions.map((sugg, idx) => (
-                        <div key={`eng-${idx}`} className="flex flex-col sm:flex-row sm:items-start justify-between bg-white p-4 rounded-lg border border-indigo-50 shadow-sm gap-4">
+                        <div key={`eng-${idx}`} className={`flex flex-col sm:flex-row sm:items-start justify-between p-4 rounded-lg border shadow-sm gap-4 transition-colors ${
+                          isDark ? "bg-zinc-950/20 border-zinc-800" : "bg-white border-indigo-50"
+                        }`}>
                           <div className="flex items-start gap-3">
                             <div className="mt-1.5 shrink-0 w-2 h-2 rounded-full bg-blue-400" />
                             <div>
-                              <p className="text-sm font-bold text-gray-900 mb-0.5">
+                              <p className={`text-sm font-bold mb-0.5 ${isDark ? "text-zinc-200" : "text-gray-900"}`}>
                                 {sugg.type === 'encode' && `Encode "${sugg.columns?.[0]}"`}
                                 {sugg.type === 'scale'  && `Scale "${sugg.columns?.[0]}"`}
                               </p>
-                              <p className="text-xs text-gray-500">{sugg.explanation}</p>
-                              <p className="text-xs text-indigo-600 mt-1 italic font-medium">Why: {sugg.why}</p>
+                              <p className={`text-xs ${isDark ? "text-zinc-400" : "text-gray-500"}`}>{sugg.explanation}</p>
+                              <p className="text-xs text-indigo-500 mt-1 italic font-medium">Why: {sugg.why}</p>
                             </div>
                           </div>
                           <button onClick={() => {
@@ -976,8 +1095,16 @@ function CleanAppContent() {
                             const { explanation, why, category, infoOnly, ...op } = sugg as any;
                             addOperation(op);
                           }}
-                            className="shrink-0 py-1.5 px-4 bg-indigo-55 hover:bg-indigo-600 hover:text-white text-indigo-700 text-xs font-bold rounded-md border border-indigo-200 transition-all flex items-center gap-1">
-                            {isDemo && <span className="text-[10px]">🔒</span>}
+                            className={`shrink-0 py-1.5 px-4 text-xs font-bold rounded-md border transition-all flex items-center gap-1 cursor-pointer ${
+                              isDark
+                                ? "bg-violet-950/30 border-violet-900/60 text-violet-400 hover:bg-violet-900/40 hover:text-white"
+                                : "bg-indigo-50 hover:bg-indigo-600 hover:text-white text-indigo-700 border-indigo-200"
+                            }`}>
+                            {isDemo && (
+                              <svg className="w-3.5 h-3.5 text-current shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                              </svg>
+                            )}
                             Add to Pipeline
                           </button>
                         </div>
@@ -988,21 +1115,31 @@ function CleanAppContent() {
                   {/* Info-only Suggestions */}
                   {infoSuggestions.length > 0 && (
                     <div className="space-y-3">
-                      <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
-                        <span>💡 Data Insights</span><div className="h-px bg-gray-200 flex-1" />
-                        <span className="text-[10px] font-normal bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full">Info only</span>
+                      <h3 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-2 ${isDark ? "text-zinc-500" : "text-gray-400"}`}>
+                        <span>Data Insights</span><div className={`h-px flex-1 ${isDark ? "bg-zinc-800" : "bg-gray-200"}`} />
+                        <span className={`text-[10px] font-normal px-2 py-0.5 rounded-full ${isDark ? "bg-teal-950/40 border border-teal-900/40 text-teal-400" : "bg-teal-100 text-teal-700"}`}>Info only</span>
                       </h3>
                       {infoSuggestions.map((sugg, idx) => (
-                        <div key={`info-${idx}`} className="bg-teal-55/60 border border-teal-100 rounded-lg p-4 flex items-start gap-3">
+                        <div key={`info-${idx}`} className={`border rounded-lg p-4 flex items-start gap-3 transition-colors ${
+                          isDark ? "bg-teal-950/10 border-teal-900/40 text-zinc-300" : "bg-teal-50 border-teal-200"
+                        }`}>
                           <span className="text-teal-500 text-lg shrink-0 mt-0.5">
-                            {sugg.category === 'Info' && sugg.why?.includes('skew') ? '📈' : '📅'}
+                            {sugg.why?.includes('skew') ? (
+                              <svg className="w-5 h-5 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M7 12l3-3 3 3 4-4M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                              </svg>
+                            ) : (
+                              <svg className="w-5 h-5 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                              </svg>
+                            )}
                           </span>
                           <div>
-                            <p className="text-sm font-bold text-teal-900 mb-0.5">
+                            <p className={`text-sm font-bold mb-0.5 ${isDark ? "text-teal-400" : "text-teal-900"}`}>
                               {sugg.why?.includes('skew') ? `High Skew Detected: "${sugg.columns?.[0]}"` : `Date Column: "${sugg.columns?.[0]}"`}
                             </p>
-                            <p className="text-xs text-teal-700">{sugg.explanation}</p>
-                            <p className="text-xs text-gray-600 mt-1.5 leading-relaxed whitespace-pre-line">{sugg.why}</p>
+                            <p className={`text-xs ${isDark ? "text-teal-400" : "text-teal-700"}`}>{sugg.explanation}</p>
+                            <p className={`text-xs mt-1.5 leading-relaxed whitespace-pre-line ${isDark ? "text-zinc-400" : "text-gray-600"}`}>{sugg.why}</p>
                           </div>
                         </div>
                       ))}
@@ -1011,7 +1148,7 @@ function CleanAppContent() {
 
                   {/* Apply All Actionable Suggestions */}
                   {smartSuggestions.length > 1 && (
-                    <div className="pt-4 border-t border-indigo-100 flex justify-end">
+                    <div className={`pt-4 border-t flex justify-end ${isDark ? "border-zinc-800" : "border-indigo-100"}`}>
                       <button onClick={() => {
                         if (isDemo) {
                           setAuthReason("Applying smart suggestions automatically is only available for registered users.");
@@ -1021,10 +1158,12 @@ function CleanAppContent() {
                         }
                         smartSuggestions.forEach(s => { const { explanation, why, category, infoOnly, ...op } = s as any; addOperation(op); });
                         markSuggestionsSeen();
-                      }} className="py-2.5 px-6 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-md shadow-sm transition-all hover:shadow-md flex items-center gap-2">
+                      }} className="py-2.5 px-6 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-md shadow-sm transition-all hover:shadow-md flex items-center gap-2 cursor-pointer">
                         {isDemo ? (
                           <>
-                            <span>🔒</span>
+                            <svg className="w-3.5 h-3.5 text-current shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                            </svg>
                             <span>Apply All Suggestions</span>
                           </>
                         ) : (
@@ -1041,9 +1180,13 @@ function CleanAppContent() {
             )}
 
             {/* Data Cleaning Pipeline UI */}
-            <section className="bg-white rounded-xl shadow-sm border border-gray-100 mt-8">
-              <div className="px-6 py-4 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-gray-900 flex items-center space-x-2">
+            <section className={`rounded-xl border mt-8 transition-colors ${
+              isDark ? "bg-zinc-900 border-zinc-800 shadow-[0_8px_30px_rgb(0,0,0,0.5)]" : "bg-white border-gray-100 shadow-sm"
+            }`}>
+              <div className={`px-6 py-4 border-b flex items-center justify-between transition-colors ${
+                isDark ? "bg-zinc-950/40 border-zinc-800" : "bg-gray-50 border-gray-100"
+              }`}>
+                <h2 className={`text-lg font-semibold flex items-center space-x-2 ${isDark ? "text-white" : "text-gray-900"}`}>
                   <svg className="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
                   <span>Data Preprocessing Pipeline</span>
                 </h2>
@@ -1051,58 +1194,62 @@ function CleanAppContent() {
               <div className="p-6 flex flex-col md:flex-row gap-8">
                 {/* Operations Form */}
                 <div className="flex-1 space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Operation Type</label>
-                    <select value={opType} onChange={(e: any) => { setOpType(e.target.value); setSelectedCol(""); }} className="w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 p-2 border">
-                      <optgroup label="🧹 Data Cleaning">
-                        <option value="drop_duplicates">Remove Duplicate Rows</option>
-                        <option value="drop_columns">Drop Column</option>
-                        <option value="impute">Fill Missing Values (Impute)</option>
-                      </optgroup>
-                      <optgroup label="⚙️ Feature Engineering">
-                        <option value="encode">Encode Categorical (Strings only)</option>
-                        <option value="scale">Scale Numerical (Numerics only)</option>
-                      </optgroup>
-                    </select>
-                  </div>
+                    <CustomSelect
+                      value={opType}
+                      onChange={(val: any) => { setOpType(val); setSelectedCol(""); }}
+                      isDark={isDark}
+                      options={[
+                        { value: "drop_duplicates", label: "Remove Duplicate Rows", group: "Data Cleaning" },
+                        { value: "drop_columns", label: "Drop Column", group: "Data Cleaning" },
+                        { value: "impute", label: "Fill Missing Values (Impute)", group: "Data Cleaning" },
+                        { value: "encode", label: "Encode Categorical (Strings only)", group: "Feature Engineering" },
+                        { value: "scale", label: "Scale Numerical (Numerics only)", group: "Feature Engineering" },
+                      ]}
+                    />
 
                   {opType !== "drop_duplicates" && (
-                     <div>
-                       <label className="block text-sm font-medium text-gray-700 mb-1">Select Column</label>
-                       <select value={selectedCol} onChange={(e) => {
-                          setSelectedCol(e.target.value);
-                          const isColNum = profile?.columns[e.target.value]?.dtype.match(/(int|float|numeric)/i);
+                    <div>
+                      <label className={`block text-sm font-medium mb-1.5 ${isDark ? "text-zinc-400" : "text-gray-700"}`}>Select Column</label>
+                      <CustomSelect
+                        value={selectedCol}
+                        onChange={(val) => {
+                          setSelectedCol(val);
+                          const isColNum = profile?.columns[val]?.dtype.match(/(int|float|numeric)/i);
                           if (!isColNum && (imputeStrategy === "mean" || imputeStrategy === "median")) {
                             setImputeStrategy("mode");
                           }
-                       }} className="w-full border-gray-300 rounded-md shadow-sm p-2 border">
-                         <option value="">-- Select --</option>
-                         {Object.keys(profile.columns)
-                           .filter(col => {
+                        }}
+                        isDark={isDark}
+                        placeholder="-- Select --"
+                        options={[
+                          { value: "", label: "-- Select --" },
+                          ...Object.keys(profile.columns)
+                            .filter(col => {
                               const isNum = profile.columns[col].dtype.match(/(int|float|numeric)/i);
                               if (opType === "encode" && isNum) return false;
                               if (opType === "scale" && !isNum) return false;
                               return true;
-                           })
-                           .sort((a, b) => profile.columns[b].null_count - profile.columns[a].null_count)
-                           .map(col => {
-                             const isNum = profile.columns[col].dtype.match(/(int|float|numeric)/i);
-                             const missingCount = profile.columns[col].null_count;
-                             const isImputeDisabled = opType === "impute" && missingCount === 0;
-
-                             return (
-                               <option key={col} value={col} disabled={isImputeDisabled}>
-                                 {col} [{isNum ? "numeric" : "string"}] (missing: {missingCount}) {isImputeDisabled ? " 🔒" : ""}
-                               </option>
-                             );
-                           }
-                         )}
-                       </select>
-                     </div>
+                            })
+                            .sort((a, b) => profile.columns[b].null_count - profile.columns[a].null_count)
+                            .map(col => {
+                              const isNum = profile.columns[col].dtype.match(/(int|float|numeric)/i);
+                              const missingCount = profile.columns[col].null_count;
+                              const isImputeDisabled = opType === "impute" && missingCount === 0;
+                              return {
+                                value: col,
+                                label: `${col} [${isNum ? "numeric" : "string"}] (missing: ${missingCount})${isImputeDisabled ? " [no missing]" : ""}`,
+                                disabled: isImputeDisabled
+                              };
+                            })
+                        ]}
+                      />
+                    </div>
                   )}
 
                   {opType === "impute" && selectedCol && profile?.columns[selectedCol]?.null_count === 0 && (
-                     <div className="text-sm text-amber-600 bg-amber-50 p-2 rounded-md border border-amber-200">
+                     <div className={`text-sm p-2 rounded-md border ${
+                       isDark ? "bg-amber-950/20 border-amber-900/40 text-amber-400" : "bg-amber-50 border-amber-200 text-amber-700"
+                     }`}>
                         This column has no missing values. Imputation is not needed.
                      </div>
                   )}
@@ -1110,62 +1257,87 @@ function CleanAppContent() {
                   {opType === "impute" && selectedCol && profile?.columns[selectedCol]?.null_count > 0 && (
                     <>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Strategy</label>
-                        <select value={imputeStrategy} onChange={(e: any) => setImputeStrategy(e.target.value)} className="w-full border-gray-300 rounded-md shadow-sm p-2 border">
-                          {isNumericCol && <option value="mean">Mean (numerical only)</option>}
-                          {isNumericCol && <option value="median">Median (numerical only)</option>}
-                          <option value="mode">Mode (most frequent)</option>
-                          <option value="constant">Constant Value</option>
-                          <option value="drop">Drop rows with missing</option>
-                        </select>
+                        <label className={`block text-sm font-medium mb-1.5 ${isDark ? "text-zinc-400" : "text-gray-700"}`}>Strategy</label>
+                        <CustomSelect
+                          value={imputeStrategy}
+                          onChange={(val: any) => setImputeStrategy(val)}
+                          isDark={isDark}
+                          options={[
+                            ...(isNumericCol ? [
+                              { value: "mean", label: "Mean (numerical only)" },
+                              { value: "median", label: "Median (numerical only)" }
+                            ] : []),
+                            { value: "mode", label: "Mode (most frequent)" },
+                            { value: "constant", label: "Constant Value" },
+                            { value: "drop", label: "Drop rows with missing" }
+                          ]}
+                        />
                       </div>
                       {imputeStrategy === "constant" && (
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Fill Value</label>
-                          <input type="text" value={fillValue} onChange={(e) => setFillValue(e.target.value)} className="w-full border-gray-300 rounded-md shadow-sm p-2 border" placeholder="e.g. Unknown or 0" />
+                          <label className={`block text-sm font-medium mb-1.5 ${isDark ? "text-zinc-400" : "text-gray-700"}`}>Fill Value</label>
+                          <input type="text" value={fillValue} onChange={(e) => setFillValue(e.target.value)} className={`w-full rounded-md shadow-sm p-2 border outline-none ${
+                            isDark ? "bg-zinc-950 border-zinc-800 text-white focus:ring-violet-500/20 focus:border-violet-500 hover:border-zinc-700" : "bg-white border-gray-300 text-gray-700 focus:ring-indigo-500/20 focus:border-indigo-500"
+                          }`} placeholder="e.g. Unknown or 0" />
                         </div>
                       )}
                     </>
                   )}
 
                   {opType === "encode" && (
-                     <div>
-                       <label className="block text-sm font-medium text-gray-700 mb-1">Encoding Strategy</label>
-                       <select value={encodeStrategy} onChange={(e: any) => setEncodeStrategy(e.target.value)} className="w-full border-gray-300 rounded-md shadow-sm p-2 border">
-                         <option value="label">Label Encoding (0, 1, 2...)</option>
-                         <option value="onehot">One-Hot Encoding (Creates new columns)</option>
-                       </select>
-                     </div>
+                    <div>
+                      <label className={`block text-sm font-medium mb-1.5 ${isDark ? "text-zinc-400" : "text-gray-700"}`}>Encoding Strategy</label>
+                      <CustomSelect
+                        value={encodeStrategy}
+                        onChange={(val: any) => setEncodeStrategy(val)}
+                        isDark={isDark}
+                        options={[
+                          { value: "label", label: "Label Encoding (0, 1, 2...)" },
+                          { value: "onehot", label: "One-Hot Encoding (Creates new columns)" }
+                        ]}
+                      />
+                    </div>
                   )}
 
                   {opType === "scale" && (
-                     <div>
-                       <label className="block text-sm font-medium text-gray-700 mb-1">Scaling Strategy</label>
-                       <select value={scaleStrategy} onChange={(e: any) => setScaleStrategy(e.target.value)} className="w-full border-gray-300 rounded-md shadow-sm p-2 border">
-                         <option value="standard">Standard Scaler (Z-Score)</option>
-                         <option value="minmax">Min-Max Scaler (0 to 1)</option>
-                       </select>
-                     </div>
+                    <div>
+                      <label className={`block text-sm font-medium mb-1.5 ${isDark ? "text-zinc-400" : "text-gray-700"}`}>Scaling Strategy</label>
+                      <CustomSelect
+                        value={scaleStrategy}
+                        onChange={(val: any) => setScaleStrategy(val)}
+                        isDark={isDark}
+                        options={[
+                          { value: "standard", label: "Standard Scaler (Z-Score)" },
+                          { value: "minmax", label: "Min-Max Scaler (0 to 1)" }
+                        ]}
+                      />
+                    </div>
                   )}
 
-                  <button onClick={handleAddOperation} className="w-full py-2 px-4 bg-gray-100 hover:bg-gray-200 text-gray-800 font-semibold rounded-md transition-colors border border-gray-205">
+                  <button onClick={handleAddOperation} className={`w-full py-2 px-4 font-semibold rounded-md transition-colors border cursor-pointer ${
+                    isDark ? "bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border-zinc-800" : "bg-gray-100 hover:bg-gray-200 text-gray-800 border-gray-200"
+                  }`}>
                     Add Step to Pipeline
                   </button>
                 </div>
 
                 {/* Pipeline Display */}
-                <div className="flex-1 bg-gray-50 p-4 rounded-xl border border-gray-100 flex flex-col">
-                  <h3 className="font-semibold text-gray-800 mb-4">Pending Pipeline Steps</h3>
+                <div className={`flex-1 p-4 rounded-xl border flex flex-col transition-colors ${
+                  isDark ? "bg-zinc-950 border-zinc-800" : "bg-gray-50 border-gray-100"
+                }`}>
+                  <h3 className={`font-semibold mb-4 ${isDark ? "text-zinc-200" : "text-gray-800"}`}>Pending Pipeline Steps</h3>
                   <div className="flex-1 space-y-3 overflow-y-auto max-h-64">
                     {operations.length === 0 ? (
                       <div className="text-gray-400 text-sm text-center italic py-8">No steps added yet.</div>
                     ) : (
                       operations.map((op, idx) => (
-                        <div key={op.id} className="bg-white p-3 rounded-lg border border-gray-200 shadow-sm flex items-center justify-between group">
+                        <div key={op.id} className={`p-3 rounded-lg border shadow-sm flex items-center justify-between group transition-colors ${
+                          isDark ? "bg-zinc-900 border-zinc-800 text-zinc-300" : "bg-white border-gray-200 text-gray-800"
+                        }`}>
                           <div className="flex items-center space-x-3">
                             <span className="bg-indigo-100 text-indigo-800 text-xs font-bold px-2 py-1 rounded-full">{idx + 1}</span>
                             <div>
-                              <p className="text-sm font-medium text-gray-800">
+                              <p className={`text-sm font-medium ${isDark ? "text-zinc-200" : "text-gray-800"}`}>
                                 {op.type === "drop_duplicates" && "Drop Duplicates"}
                                 {op.type === "drop_columns" && `Drop Col: ${op.columns?.join(", ")}`}
                                 {op.type === "impute" && `Impute: ${op.columns?.join(", ")}`}
@@ -1173,13 +1345,13 @@ function CleanAppContent() {
                                 {op.type === "scale" && `Scale: ${op.columns?.join(", ")}`}
                               </p>
                               {op.type !== "drop_duplicates" && op.type !== "drop_columns" && (
-                                <p className="text-xs text-gray-500">
+                                <p className="text-xs text-zinc-500">
                                   Strategy: {op.strategy === "onehot" ? "One-Hot" : op.strategy === "label" ? "Label" : op.strategy} {op.fill_value && `(${op.fill_value})`}
                                 </p>
                               )}
                             </div>
                           </div>
-                          <button onClick={() => removeOperation(op.id)} className="text-gray-400 hover:text-red-500 transition-colors p-1" title="Remove Step">
+                          <button onClick={() => removeOperation(op.id)} className="text-zinc-500 hover:text-red-500 transition-colors p-1 cursor-pointer" title="Remove Step">
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                           </button>
                         </div>
@@ -1188,14 +1360,14 @@ function CleanAppContent() {
                   </div>
                   
                   {operations.length > 0 && (
-                    <button onClick={handleApplyPipeline} disabled={cleaning} className="mt-4 w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-md shadow-sm transition-colors flex justify-center items-center">
+                    <button onClick={handleApplyPipeline} disabled={cleaning} className="mt-4 w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-md shadow-sm transition-colors flex justify-center items-center cursor-pointer">
                       {cleaning ? (
                         <span className="flex items-center space-x-2"><svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><span>Processing pipeline...</span></span>
                       ) : "Apply Pipeline"}
                     </button>
                   )}
                   {history.length > 0 && operations.length === 0 && (
-                    <button onClick={handleRevert} className="mt-4 w-full py-3 px-4 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-md shadow-sm transition-colors flex justify-center items-center space-x-2">
+                    <button onClick={handleRevert} className="mt-4 w-full py-3 px-4 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-md shadow-sm transition-colors flex justify-center items-center space-x-2 cursor-pointer">
                       <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"></path></svg>
                       <span>Revert Last Pipeline Step</span>
                     </button>
@@ -1212,10 +1384,18 @@ function CleanAppContent() {
                           }
                           handleExport("csv");
                         }}
-                        className="flex-1 py-3 px-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-md shadow-sm transition-colors flex justify-center items-center space-x-2"
+                        className="flex-1 py-3 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-md shadow-sm transition-colors flex justify-center items-center space-x-2 cursor-pointer"
                         title="Download as CSV"
                       >
-                        <span className="text-sm shrink-0">{isDemo ? "🔒" : "📥"}</span>
+                        {isDemo ? (
+                          <svg className="w-3.5 h-3.5 text-current shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                          </svg>
+                        ) : (
+                          <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                          </svg>
+                        )}
                         <span>Export CSV</span>
                       </button>
                       <button
@@ -1228,10 +1408,18 @@ function CleanAppContent() {
                           }
                           handleExport("pkl");
                         }}
-                        className="flex-1 py-3 px-3 bg-violet-600 hover:bg-violet-700 text-white font-semibold rounded-md shadow-sm transition-colors flex justify-center items-center space-x-2"
+                        className="flex-1 py-3 px-3 bg-violet-600 hover:bg-violet-700 text-white font-semibold rounded-md shadow-sm transition-colors flex justify-center items-center space-x-2 cursor-pointer"
                         title="Download as Pickle (.pkl) — load with pandas.read_pickle()"
                       >
-                        <span className="text-sm shrink-0">{isDemo ? "🔒" : "📦"}</span>
+                        {isDemo ? (
+                          <svg className="w-3.5 h-3.5 text-current shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                          </svg>
+                        ) : (
+                          <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                          </svg>
+                        )}
                         <span>Export PKL</span>
                       </button>
                     </div>
@@ -1248,12 +1436,19 @@ function CleanAppContent() {
 }
 
 export default function CleanPage() {
+  const { theme } = usePipelineStore();
+  const isDark = theme === "dark";
+  
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className={`min-h-screen flex items-center justify-center transition-colors ${
+        isDark ? "bg-zinc-950 text-zinc-400" : "bg-gray-50 text-gray-500"
+      }`}>
         <div className="text-center">
-          <div className="animate-spin h-8 w-8 text-indigo-650 mx-auto mb-4 border-4 border-indigo-200 border-t-indigo-600 rounded-full"></div>
-          <p className="text-gray-500 font-medium">Loading CleanML...</p>
+          <div className={`animate-spin h-8 w-8 mx-auto mb-4 border-4 rounded-full ${
+            isDark ? "border-zinc-800 border-t-violet-500" : "border-indigo-200 border-t-indigo-600"
+          }`}></div>
+          <p className="font-medium">Loading RefineML...</p>
         </div>
       </div>
     }>

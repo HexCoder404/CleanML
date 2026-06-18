@@ -75,9 +75,10 @@ interface CommentNodeProps {
   upvotedIds: Set<string>;
   downvotedIds: Set<string>;
   depth: number;
+  isDark: boolean;
 }
 
-function CommentNode({ comment, onReply, onVote, onDelete, isAdmin, upvotedIds, downvotedIds, depth }: CommentNodeProps) {
+function CommentNode({ comment, onReply, onVote, onDelete, isAdmin, upvotedIds, downvotedIds, depth, isDark }: CommentNodeProps) {
   const [showReplyBox, setShowReplyBox] = useState(false);
   const [showReplies, setShowReplies] = useState(false);
   const [replyText, setReplyText] = useState("");
@@ -97,9 +98,7 @@ function CommentNode({ comment, onReply, onVote, onDelete, isAdmin, upvotedIds, 
       } else {
         await onVote(comment.id, 1, 0);
       }
-    } catch (err) {
-      // Error handled by parent
-    }
+    } catch (err) {}
   };
 
   const handleDownvote = async () => {
@@ -111,9 +110,7 @@ function CommentNode({ comment, onReply, onVote, onDelete, isAdmin, upvotedIds, 
       } else {
         await onVote(comment.id, 0, 1);
       }
-    } catch (err) {
-      // Error handled by parent
-    }
+    } catch (err) {}
   };
 
   const handleSubmitReply = async (e: React.FormEvent) => {
@@ -125,9 +122,7 @@ function CommentNode({ comment, onReply, onVote, onDelete, isAdmin, upvotedIds, 
       setReplyText("");
       setShowReplyBox(false);
       setShowReplies(true);
-    } catch (err) {
-      // Error handled by parent
-    } finally {
+    } catch (err) {} finally {
       setIsSubmitting(false);
     }
   };
@@ -136,39 +131,55 @@ function CommentNode({ comment, onReply, onVote, onDelete, isAdmin, upvotedIds, 
     <div className="group relative mt-4">
       {/* Visual Guideline for Threaded Comments */}
       {comment.parent_id && (
-        <div className="absolute -left-5 top-0 bottom-0 w-0.5 bg-gray-100 group-hover:bg-indigo-200 transition-colors" />
+        <div className={`absolute -left-5 top-0 bottom-0 w-0.5 transition-colors ${
+          isDark ? "bg-zinc-800 group-hover:bg-violet-800" : "bg-gray-100 group-hover:bg-indigo-200"
+        }`} />
       )}
 
-      <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all duration-200 relative">
+      <div className={`border rounded-2xl p-5 shadow-sm hover:shadow-md transition-all duration-200 relative ${
+        isDark ? "bg-zinc-900 border-zinc-800 text-zinc-300 shadow-[0_4px_20px_rgba(0,0,0,0.4)]" : "bg-white border-gray-100 text-gray-700"
+      }`}>
         <div className="flex items-start space-x-3.5">
           {/* Avatar Placeholder */}
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-50 to-indigo-100 text-indigo-600 font-extrabold flex items-center justify-center text-sm shadow-sm select-none border border-indigo-200/50">
+          <div className={`w-10 h-10 rounded-full font-extrabold flex items-center justify-center text-sm shadow-sm select-none border ${
+            isDark 
+              ? "bg-gradient-to-br from-zinc-950 to-zinc-900 text-violet-400 border-zinc-800"
+              : "bg-gradient-to-br from-indigo-50 to-indigo-100 text-indigo-600 border-indigo-200/50"
+          }`}>
             {comment.username.charAt(0).toUpperCase()}
           </div>
           <div className="flex-1 min-w-0">
             {/* Username and Time */}
             <div className="flex items-center space-x-2">
-              <span className="font-bold text-gray-900 text-sm tracking-tight">{comment.username}</span>
-              <span className="text-gray-400 text-[10px] select-none">•</span>
-              <span className="text-gray-400 text-xs font-medium">{formatTimestamp(comment.timestamp)}</span>
+              <span className={`font-bold text-sm tracking-tight ${
+                isDark ? "text-neutral-100" : "text-gray-900"
+              }`}>{comment.username}</span>
+              <span className="text-neutral-500 text-[10px] select-none">•</span>
+              <span className="text-neutral-500 text-xs font-medium">{formatTimestamp(comment.timestamp)}</span>
             </div>
 
             {/* Comment Body */}
-            <p className="mt-2 text-gray-700 text-sm whitespace-pre-wrap leading-relaxed">
+            <p className={`mt-2 text-sm whitespace-pre-wrap leading-relaxed ${
+              isDark ? "text-neutral-300" : "text-zinc-700"
+            }`}>
               {comment.text}
             </p>
 
             {/* Actions */}
             <div className="mt-3 flex items-center space-x-3">
               {/* Reddit-style Voting Widget */}
-              <div className="flex items-center bg-gray-50 border border-gray-100 rounded-full px-1.5 py-0.5 shadow-sm select-none">
+              <div className={`flex items-center border rounded-full px-1.5 py-0.5 shadow-sm select-none ${
+                isDark ? "bg-zinc-950 border-zinc-800" : "bg-zinc-50 border-zinc-100"
+              }`}>
                 <button
                   type="button"
                   onClick={handleUpvote}
-                  className={`p-1 rounded-full transition-colors ${
+                  className={`p-1 rounded-full transition-colors cursor-pointer ${
                     isUpvoted
-                      ? "text-indigo-600 bg-indigo-50"
-                      : "text-gray-400 hover:text-indigo-600 hover:bg-gray-100"
+                      ? isDark
+                        ? "text-violet-400 bg-violet-900/20"
+                        : "text-indigo-600 bg-indigo-50"
+                      : "text-zinc-400 hover:text-indigo-600 hover:bg-zinc-100"
                   }`}
                   title={isUpvoted ? "Remove upvote" : "Upvote"}
                   aria-label="Upvote"
@@ -179,17 +190,17 @@ function CommentNode({ comment, onReply, onVote, onDelete, isAdmin, upvotedIds, 
                 </button>
                 <span className={`text-[11px] font-bold px-1.5 min-w-[16px] text-center transition-colors ${
                   isUpvoted 
-                    ? "text-indigo-600" 
+                    ? isDark ? "text-violet-400" : "text-indigo-600" 
                     : isDownvoted 
                     ? "text-rose-600" 
-                    : "text-gray-600"
+                    : "text-gray-500"
                 }`}>
                   {formatScore(score)}
                 </span>
                 <button
                   type="button"
                   onClick={handleDownvote}
-                  className={`p-1 rounded-full transition-colors ${
+                  className={`p-1 rounded-full transition-colors cursor-pointer ${
                     isDownvoted
                       ? "text-rose-600 bg-rose-50"
                       : "text-gray-400 hover:text-rose-600 hover:bg-gray-100"
@@ -207,10 +218,12 @@ function CommentNode({ comment, onReply, onVote, onDelete, isAdmin, upvotedIds, 
               <button
                 type="button"
                 onClick={() => setShowReplyBox(!showReplyBox)}
-                className={`text-xs font-bold flex items-center space-x-1.5 px-3 py-1.5 rounded-full border transition-all duration-200 ${
+                className={`text-xs font-bold flex items-center space-x-1.5 px-3 py-1.5 rounded-full border transition-all duration-200 cursor-pointer ${
                   showReplyBox
                     ? "bg-rose-50 text-rose-600 border-rose-100 hover:bg-rose-100"
-                    : "text-indigo-600 hover:text-indigo-800 border-gray-100 hover:bg-indigo-50/50 hover:border-indigo-100/30"
+                    : isDark
+                      ? "text-violet-400 border-zinc-800 hover:bg-violet-900/20 hover:border-violet-900/30"
+                      : "text-indigo-600 hover:text-indigo-800 border-gray-100 hover:bg-indigo-50/50 hover:border-indigo-100/30"
                 }`}
               >
                 {showReplyBox ? (
@@ -235,10 +248,14 @@ function CommentNode({ comment, onReply, onVote, onDelete, isAdmin, upvotedIds, 
                 <button
                   type="button"
                   onClick={() => setShowReplies(!showReplies)}
-                  className={`text-xs font-bold flex items-center space-x-1.5 px-3 py-1.5 rounded-full border transition-all duration-200 ${
+                  className={`text-xs font-bold flex items-center space-x-1.5 px-3 py-1.5 rounded-full border transition-all duration-200 cursor-pointer ${
                     showReplies
-                      ? "bg-indigo-50 text-indigo-700 border-indigo-200/50 hover:bg-indigo-100/40"
-                      : "bg-white text-gray-500 hover:text-indigo-600 border-gray-200 hover:bg-gray-50 hover:border-gray-300"
+                      ? isDark
+                        ? "bg-violet-900/40 text-violet-400 border-violet-900/30"
+                        : "bg-indigo-50 text-indigo-700 border-indigo-200/50"
+                      : isDark
+                        ? "bg-zinc-900 text-zinc-400 border-zinc-800 hover:text-zinc-200"
+                        : "bg-white text-gray-500 hover:text-indigo-600 border-gray-200 hover:bg-gray-50"
                   }`}
                 >
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -257,7 +274,7 @@ function CommentNode({ comment, onReply, onVote, onDelete, isAdmin, upvotedIds, 
                       await onDelete(comment.id);
                     }
                   }}
-                  className="text-xs font-bold flex items-center space-x-1.5 px-3 py-1.5 rounded-full border border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100 transition-all duration-200"
+                  className="text-xs font-bold flex items-center space-x-1.5 px-3 py-1.5 rounded-full border border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100 transition-all duration-200 cursor-pointer"
                 >
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -271,7 +288,9 @@ function CommentNode({ comment, onReply, onVote, onDelete, isAdmin, upvotedIds, 
             {showReplyBox && (
               <form
                 onSubmit={handleSubmitReply}
-                className="mt-4 bg-gray-50 border border-gray-100 p-3.5 rounded-xl space-y-3 animate-in fade-in slide-in-from-top-2 duration-200"
+                className={`mt-4 border p-3.5 rounded-xl space-y-3 animate-in fade-in slide-in-from-top-2 duration-200 ${
+                  isDark ? "bg-zinc-950 border-zinc-800" : "bg-gray-50 border-gray-100"
+                }`}
               >
                 <textarea
                   value={replyText}
@@ -279,7 +298,11 @@ function CommentNode({ comment, onReply, onVote, onDelete, isAdmin, upvotedIds, 
                   placeholder={`Reply to ${comment.username}...`}
                   rows={2}
                   maxLength={700}
-                  className="w-full text-sm bg-white border border-gray-200 rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-gray-800 placeholder-gray-400 resize-none transition-all"
+                  className={`w-full text-sm rounded-lg p-2.5 outline-none transition-all resize-none ${
+                    isDark
+                      ? "bg-zinc-900 border-zinc-800 focus:ring-violet-500/20 focus:border-violet-500 text-white placeholder-zinc-500"
+                      : "bg-white border-gray-200 focus:ring-indigo-500/20 focus:border-indigo-500 text-gray-800 placeholder-gray-400"
+                  }`}
                   autoFocus
                 />
                 <div className="flex items-center justify-between">
@@ -288,7 +311,7 @@ function CommentNode({ comment, onReply, onVote, onDelete, isAdmin, upvotedIds, 
                       ? "text-rose-500 animate-pulse" 
                       : replyText.length > 500 
                       ? "text-amber-500" 
-                      : "text-gray-400"
+                      : "text-neutral-500"
                   }`}>
                     {replyText.length} / 700
                   </span>
@@ -299,14 +322,16 @@ function CommentNode({ comment, onReply, onVote, onDelete, isAdmin, upvotedIds, 
                         setShowReplyBox(false);
                         setReplyText("");
                       }}
-                      className="px-3 py-1.5 text-xs text-gray-600 hover:text-gray-900 font-semibold rounded-lg hover:bg-gray-100 transition-colors"
+                      className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
+                        isDark ? "text-zinc-400 hover:text-white hover:bg-zinc-900" : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                      }`}
                     >
                       Cancel
                     </button>
                     <button
                       type="submit"
                       disabled={isSubmitting || !replyText.trim() || replyText.length > 700}
-                      className="px-4 py-1.5 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-1"
+                      className="px-4 py-1.5 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-1 cursor-pointer"
                     >
                       {isSubmitting ? (
                         <>
@@ -330,7 +355,9 @@ function CommentNode({ comment, onReply, onVote, onDelete, isAdmin, upvotedIds, 
 
       {/* Recursive nested comments (Replies) */}
       {showReplies && comment.replies && comment.replies.length > 0 && (
-        <div className="ml-6 pl-4 border-l border-gray-100 mt-2 space-y-3">
+        <div className={`ml-6 pl-4 border-l mt-2 space-y-3 ${
+          isDark ? "border-zinc-800" : "border-gray-100"
+        }`}>
           {comment.replies.map((reply) => (
             <CommentNode 
               key={reply.id} 
@@ -342,6 +369,7 @@ function CommentNode({ comment, onReply, onVote, onDelete, isAdmin, upvotedIds, 
               upvotedIds={upvotedIds}
               downvotedIds={downvotedIds}
               depth={depth + 1} 
+              isDark={isDark}
             />
           ))}
         </div>
@@ -362,12 +390,13 @@ export default function FeedbackPage() {
   const [sortBy, setSortBy] = useState<"upvotes" | "newest">("upvotes");
   const [upvotedIds, setUpvotedIds] = useState<Set<string>>(new Set());
   const [downvotedIds, setDownvotedIds] = useState<Set<string>>(new Set());
-  const { user } = usePipelineStore();
+  const { user, theme } = usePipelineStore();
+
+  const isDark = theme === "dark";
 
   // Load upvoted/downvoted comment IDs on mount
   useEffect(() => {
     try {
-      
       const storedUp = localStorage.getItem("cleanml_upvoted_comments");
       if (storedUp) {
         setUpvotedIds(new Set(JSON.parse(storedUp)));
@@ -531,7 +560,9 @@ export default function FeedbackPage() {
   });
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900 font-sans">
+    <div className={`min-h-screen font-sans transition-colors duration-250 ${
+      isDark ? "bg-zinc-950 text-zinc-300" : "bg-gray-50 text-gray-900"
+    }`}>
       <ToastContainer />
 
       {/* Navbar */}
@@ -541,12 +572,18 @@ export default function FeedbackPage() {
       <main className="max-w-3xl mx-auto px-6 py-10 space-y-8">
         
         {/* Header with write icon on the right */}
-        <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-6 border-b border-gray-200/60 gap-4">
+        <header className={`flex flex-col sm:flex-row sm:items-center sm:justify-between pb-6 border-b gap-4 ${
+          isDark ? "border-zinc-800" : "border-gray-200/60"
+        }`}>
           <div className="space-y-1">
-            <h1 className="text-3xl font-black tracking-tight text-gray-900 bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
+            <h1 className={`text-3xl font-black tracking-tight ${
+              isDark ? "text-white" : "text-gray-900"
+            }`}>
               Community Feedback
             </h1>
-            <p className="text-gray-500 text-sm">
+            <p className={`text-sm ${
+              isDark ? "text-zinc-500" : "text-gray-500"
+            }`}>
               Spotted an issue, have a request, or want to share ideas? Write a comment or reply to other users!
             </p>
           </div>
@@ -554,10 +591,12 @@ export default function FeedbackPage() {
           {/* Write feedback icon at the right */}
           <button
             onClick={() => setShowWriteBox((v) => !v)}
-            className={`p-3 rounded-full shadow-sm border transition-all duration-200 flex items-center justify-center shrink-0 ${
+            className={`p-3 rounded-full shadow-sm border transition-all duration-200 flex items-center justify-center shrink-0 cursor-pointer ${
               showWriteBox
                 ? "bg-rose-50 text-rose-600 border-rose-100 hover:bg-rose-100 hover:scale-105"
-                : "bg-indigo-50 text-indigo-600 border-indigo-100 hover:bg-indigo-100 hover:scale-105"
+                : isDark
+                  ? "bg-zinc-900 border-zinc-800 text-violet-400 hover:bg-zinc-800 hover:scale-105"
+                  : "bg-indigo-50 text-indigo-600 border-indigo-100 hover:bg-indigo-100 hover:scale-105"
             }`}
             title={showWriteBox ? "Close Form" : "Write Feedback"}
           >
@@ -577,28 +616,38 @@ export default function FeedbackPage() {
         {showWriteBox && (
           <form
             onSubmit={handleSubmitNewComment}
-            className="bg-white border border-indigo-100 rounded-2xl p-6 shadow-lg shadow-indigo-100/40 space-y-4 animate-in fade-in slide-in-from-top-4 duration-300 relative overflow-hidden"
+            className={`border rounded-2xl p-6 shadow-lg space-y-4 animate-in fade-in slide-in-from-top-4 duration-300 relative overflow-hidden ${
+              isDark ? "bg-zinc-900 border-zinc-800 shadow-neutral-950/40" : "bg-white border-indigo-100 shadow-indigo-100/40"
+            }`}
           >
             <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-indigo-500 to-violet-600"></div>
             <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2">Write a comment or issue</label>
+              <label className={`block text-sm font-bold mb-2 ${
+                isDark ? "text-zinc-200" : "text-gray-700"
+              }`}>Write a comment or issue</label>
               <textarea
                 value={newCommentText}
                 onChange={(e) => setNewCommentText(e.target.value)}
-                placeholder="What issue or feedback are you experiencing with CleanML?"
+                placeholder="What issue or feedback are you experiencing with RefineML?"
                 rows={4}
                 maxLength={700}
-                className="w-full text-sm border border-gray-200 rounded-xl p-3.5 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-gray-800 placeholder-gray-400 resize-none transition-all"
+                className={`w-full text-sm rounded-xl p-3.5 outline-none transition-all resize-none ${
+                  isDark
+                    ? "bg-zinc-950 border-zinc-800 focus:ring-violet-500/20 focus:border-violet-500 text-white placeholder-zinc-500"
+                    : "bg-white border-gray-200 focus:ring-indigo-500/20 focus:border-indigo-500 text-gray-805 placeholder-gray-400"
+                }`}
                 autoFocus
               />
             </div>
-            <div className="flex items-center justify-between border-t border-gray-100 pt-3 mt-1">
+            <div className={`flex items-center justify-between border-t pt-3 mt-1 ${
+              isDark ? "border-zinc-800" : "border-gray-100"
+            }`}>
               <span className={`text-xs font-semibold ${
                 newCommentText.length > 650 
                   ? "text-rose-500 animate-pulse" 
                   : newCommentText.length > 500 
                   ? "text-amber-500" 
-                  : "text-gray-400"
+                  : "text-neutral-500"
               }`}>
                 {newCommentText.length} / 700 characters
               </span>
@@ -609,14 +658,18 @@ export default function FeedbackPage() {
                     setShowWriteBox(false);
                     setNewCommentText("");
                   }}
-                  className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 border border-gray-200 font-semibold rounded-xl transition-colors"
+                  className={`px-4 py-2 text-sm font-semibold rounded-xl border transition-colors cursor-pointer ${
+                    isDark
+                      ? "border-neutral-800 text-neutral-400 hover:text-white hover:bg-neutral-900"
+                      : "border-gray-200 text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                  }`}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmittingNew || !newCommentText.trim() || newCommentText.length > 700}
-                  className="px-5 py-2 text-sm font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                  className="px-5 py-2 text-sm font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2 cursor-pointer"
                 >
                   {isSubmittingNew ? (
                     <>
@@ -642,31 +695,41 @@ export default function FeedbackPage() {
 
         {/* Sorting Toggles */}
         {comments.length > 0 && (
-          <div className="flex items-center justify-between bg-white border border-gray-100 rounded-2xl p-2.5 shadow-sm">
-            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-3 select-none">
+          <div className={`flex items-center justify-between border rounded-2xl p-2.5 shadow-sm transition-colors ${
+            isDark ? "bg-zinc-900 border-zinc-800 shadow-[0_4px_20px_rgba(0,0,0,0.4)]" : "bg-white border-gray-100"
+          }`}>
+            <span className="text-xs font-bold text-zinc-500 uppercase tracking-wider ml-3 select-none">
               Sort Threads
             </span>
             <div className="flex space-x-1.5">
               <button
                 onClick={() => setSortBy("upvotes")}
-                className={`px-4 py-1.5 text-xs font-bold rounded-xl transition-all duration-200 flex items-center space-x-1.5 ${
+                className={`px-4 py-1.5 text-xs font-bold rounded-xl transition-all duration-200 flex items-center space-x-1.5 cursor-pointer ${
                   sortBy === "upvotes"
                     ? "bg-indigo-600 text-white shadow-sm"
-                    : "text-gray-500 hover:text-indigo-600 hover:bg-gray-50"
+                    : isDark
+                      ? "text-zinc-400 hover:text-white hover:bg-zinc-900"
+                      : "text-gray-500 hover:text-indigo-600 hover:bg-gray-100/60"
                 }`}
               >
-                <span>🔥</span>
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" />
+                </svg>
                 <span>Most Upvoted</span>
               </button>
               <button
                 onClick={() => setSortBy("newest")}
-                className={`px-4 py-1.5 text-xs font-bold rounded-xl transition-all duration-200 flex items-center space-x-1.5 ${
+                className={`px-4 py-1.5 text-xs font-bold rounded-xl transition-all duration-200 flex items-center space-x-1.5 cursor-pointer ${
                   sortBy === "newest"
                     ? "bg-indigo-600 text-white shadow-sm"
-                    : "text-gray-500 hover:text-indigo-600 hover:bg-gray-50"
+                    : isDark
+                      ? "text-zinc-400 hover:text-white hover:bg-zinc-900"
+                      : "text-gray-500 hover:text-indigo-600 hover:bg-gray-100/60"
                 }`}
               >
-                <span>🕒</span>
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
                 <span>Newest</span>
               </button>
             </div>
@@ -681,22 +744,30 @@ export default function FeedbackPage() {
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
               </svg>
-              <p className="text-gray-500 font-semibold text-sm">Loading community comments...</p>
+              <p className="text-zinc-500 font-semibold text-sm">Loading community comments...</p>
             </div>
           ) : comments.length === 0 ? (
-            <div className="bg-white border border-gray-100 rounded-2xl p-12 text-center shadow-sm flex flex-col items-center space-y-4">
-              <div className="w-16 h-16 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-3xl">
-                💬
+            <div className={`border rounded-2xl p-12 text-center shadow-sm flex flex-col items-center space-y-4 transition-colors ${
+              isDark ? "bg-zinc-900 border-zinc-800 shadow-[0_4px_20px_rgba(0,0,0,0.4)]" : "bg-white border-gray-100"
+            }`}>
+              <div className={`w-16 h-16 rounded-full flex items-center justify-center border ${
+                isDark 
+                  ? "bg-zinc-950 border-zinc-800 text-violet-400"
+                  : "bg-indigo-50 border-indigo-100 text-indigo-600"
+              }`}>
+                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
               </div>
               <div className="space-y-1 max-w-sm">
-                <h3 className="font-bold text-gray-900 text-lg">No comments yet</h3>
-                <p className="text-gray-500 text-sm">
+                <h3 className={`font-bold text-lg ${isDark ? "text-zinc-100" : "text-gray-900"}`}>No comments yet</h3>
+                <p className={`text-sm ${isDark ? "text-zinc-500" : "text-gray-500"}`}>
                   Be the first one to write what issues you are facing, or share your thoughts with the community!
                 </p>
               </div>
               <button
                 onClick={() => setShowWriteBox(true)}
-                className="mt-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-md transition-all text-sm flex items-center space-x-2"
+                className="mt-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-md transition-all text-sm flex items-center space-x-2 cursor-pointer"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" />
@@ -717,6 +788,7 @@ export default function FeedbackPage() {
                   upvotedIds={upvotedIds}
                   downvotedIds={downvotedIds}
                   depth={0}
+                  isDark={isDark}
                 />
               ))}
             </div>

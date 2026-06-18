@@ -8,7 +8,7 @@ CleanML is an intuitive, no-code web application designed to prepare datasets fo
 
 ## 🚀 Features
 
-- **Blazing Fast Uploads:** Supports CSV, Excel, and JSON files up to 200,000 rows. Instantly converts payloads into high-performance `Parquet` format on the backend.
+- **Blazing Fast Uploads:** Supports CSV, Excel, and JSON files up to 150,000 rows. Instantly converts payloads into high-performance `Parquet` format on the backend.
 - **Deep Data Profiling:** Automatically parses the dataset to highlight row/column sizes, duplicate thresholds, categorical vs numeric separation, and missing values context.
 - **Visual Data Cleaning Pipeline:** A "wizard" style builder that allows you to sequentially stack operations. You can see the Before → After metrics happen in real-time.
   - **Imputation:** Handles missing data. Supports Mean, Median, Mode, Constants, and safe row drops. Intelligently prevents arithmetic operations on string columns.
