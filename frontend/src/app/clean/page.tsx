@@ -6,13 +6,13 @@ import { usePipelineStore, CleanOperation } from "../../store/pipelineStore";
 import { useToastStore, createToastHelpers } from "../../store/toastStore";
 import ToastContainer from "../components/ToastContainer";
 import AuthModal from "../components/AuthModal";
+import Navbar from "../components/Navbar";
 
 function CleanAppContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
   // Simulated Auth & Demo Mode
-  const [user, setUser] = useState<any>(null);
   const [isDemo, setIsDemo] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState<"signup" | "login">("signup");
@@ -52,7 +52,7 @@ function CleanAppContent() {
   const [history, setHistory] = useState<HistoryStep[]>([]);
   const sessionFiles = useRef<Set<string>>(new Set());
 
-  const { operations, hasSeenSuggestions, currentFileId, addOperation, removeOperation, clearOperations, markSuggestionsSeen, resetSuggestions, setCurrentFileId, addUploadedFileId } = usePipelineStore();
+  const { operations, hasSeenSuggestions, currentFileId, addOperation, removeOperation, clearOperations, markSuggestionsSeen, resetSuggestions, setCurrentFileId, addUploadedFileId, user, setUser } = usePipelineStore();
   const [opType, setOpType] = useState<CleanOperation["type"]>("drop_duplicates");
   const [selectedCol, setSelectedCol] = useState<string>("");
   
@@ -67,16 +67,13 @@ function CleanAppContent() {
 
   // Authenticate user check on mount
   useEffect(() => {
-    const storedUser = localStorage.getItem("cleanml_user");
     const demoParam = searchParams.get("demo") === "true";
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
+    if (user) {
       setIsDemo(false);
     } else {
-      setUser(null);
       setIsDemo(demoParam || true); // Default to demo mode if not logged in
     }
-  }, [searchParams]);
+  }, [user, searchParams]);
 
   const handleAuthSuccess = () => {
     const storedUser = localStorage.getItem("cleanml_user");
@@ -529,54 +526,7 @@ function CleanAppContent() {
       />
 
       {/* Navbar */}
-      <nav className="bg-white border-b border-gray-100 px-8 py-4 flex items-center justify-between sticky top-0 z-10 shadow-sm">
-        <Link href="/" className="flex items-center space-x-3 text-indigo-600 hover:opacity-90 transition-opacity">
-          <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path>
-          </svg>
-          <span className="text-2xl font-extrabold tracking-tight">CleanML</span>
-        </Link>
-        
-        <div className="flex items-center space-x-4">
-          <div className="hidden md:flex space-x-6 text-sm font-medium text-gray-500 items-center">
-            <Link href="/clean" className="hover:text-indigo-600 hover:border-indigo-600/50 active:text-indigo-600 active:border-indigo-600 transition-all font-semibold text-indigo-600 border-b-2 border-indigo-600 pb-1">Clean</Link>
-            <Link href="/visualize" className="hover:text-indigo-600 hover:border-indigo-600/50 active:text-indigo-600 active:border-indigo-600 transition-all border-b-2 border-transparent pb-1">Visualize Data</Link>
-            <Link href="/feedback" className="hover:text-indigo-600 hover:border-indigo-600/50 active:text-indigo-600 active:border-indigo-600 transition-all border-b-2 border-transparent pb-1">Feedback</Link>
-            <Link href="/docs" className="hover:text-indigo-600 hover:border-indigo-600/50 active:text-indigo-600 active:border-indigo-600 transition-all border-b-2 border-transparent pb-1">Docs</Link>
-          </div>
-          
-          {user ? (
-            <div className="flex items-center space-x-3 pl-4 border-l border-gray-150">
-              <div className="w-8 h-8 rounded-full bg-violet-100 text-violet-700 font-bold flex items-center justify-center text-xs" title={user.email}>
-                {user.name.slice(0, 2).toUpperCase()}
-              </div>
-              <button
-                onClick={() => {
-                  localStorage.removeItem("cleanml_user");
-                  setUser(null);
-                  setIsDemo(true);
-                  toast.success("Logged out successfully.");
-                  router.replace("/clean?demo=true");
-                }}
-                className="text-xs text-gray-400 hover:text-gray-600 font-semibold transition-all"
-              >
-                Log Out
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={() => {
-                setAuthReason("Sign in to unlock all CleanML features.");
-                setAuthMode("login");
-                setIsAuthOpen(true);
-              }}
-              className="text-sm font-semibold text-violet-600 hover:text-violet-700 bg-violet-50 hover:bg-violet-100 px-4 py-1.5 rounded-full transition-all"
-            >
-              Sign In
-            </button>
-          )}
-        </div>
-      </nav>
+      <Navbar activeTab="clean" />
 
       <main className="p-8">
         <div className="max-w-6xl mx-auto space-y-8 relative">

@@ -3,6 +3,8 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useToastStore, createToastHelpers } from "../../store/toastStore";
 import ToastContainer from "../components/ToastContainer";
+import Navbar from "../components/Navbar";
+import { usePipelineStore } from "../../store/pipelineStore";
 
 interface FeedbackNode {
   id: string;
@@ -360,15 +362,11 @@ export default function FeedbackPage() {
   const [sortBy, setSortBy] = useState<"upvotes" | "newest">("upvotes");
   const [upvotedIds, setUpvotedIds] = useState<Set<string>>(new Set());
   const [downvotedIds, setDownvotedIds] = useState<Set<string>>(new Set());
-  const [user, setUser] = useState<any>(null);
+  const { user } = usePipelineStore();
 
-  // Load user details and upvoted/downvoted comment IDs on mount
+  // Load upvoted/downvoted comment IDs on mount
   useEffect(() => {
     try {
-      const storedUser = localStorage.getItem("cleanml_user");
-      if (storedUser) {
-        setUser(JSON.parse(storedUser));
-      }
       
       const storedUp = localStorage.getItem("cleanml_upvoted_comments");
       if (storedUp) {
@@ -537,20 +535,7 @@ export default function FeedbackPage() {
       <ToastContainer />
 
       {/* Navbar */}
-      <nav className="bg-white border-b border-gray-100 px-8 py-4 flex items-center justify-between sticky top-0 z-10 shadow-sm">
-        <Link href="/" className="flex items-center space-x-3 text-indigo-600 hover:opacity-90 transition-opacity">
-          <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path>
-          </svg>
-          <span className="text-2xl font-extrabold tracking-tight">CleanML</span>
-        </Link>
-        <div className="hidden md:flex space-x-6 text-sm font-medium text-gray-500">
-          <Link href="/clean" className="hover:text-indigo-600 hover:border-indigo-600/50 active:text-indigo-600 active:border-indigo-600 transition-all border-b-2 border-transparent pb-1">Clean</Link>
-          <Link href="/visualize" className="hover:text-indigo-600 hover:border-indigo-600/50 active:text-indigo-600 active:border-indigo-600 transition-all border-b-2 border-transparent pb-1">Visualize Data</Link>
-          <Link href="/feedback" className="hover:text-indigo-600 hover:border-indigo-600/50 active:text-indigo-600 active:border-indigo-600 transition-all font-semibold text-indigo-600 border-b-2 border-indigo-600 pb-1">Feedback</Link>
-          <Link href="/docs" className="hover:text-indigo-600 hover:border-indigo-600/50 active:text-indigo-600 active:border-indigo-600 transition-all border-b-2 border-transparent pb-1">Docs</Link>
-        </div>
-      </nav>
+      <Navbar activeTab="feedback" />
 
       {/* Main Content */}
       <main className="max-w-3xl mx-auto px-6 py-10 space-y-8">

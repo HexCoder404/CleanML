@@ -1,22 +1,17 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import AuthModal from "./components/AuthModal";
+import Navbar from "./components/Navbar";
+import { usePipelineStore } from "../store/pipelineStore";
 
 export default function LandingPage() {
   const router = useRouter();
-  const [user, setUser] = useState<any>(null);
+  const { user, setUser } = usePipelineStore();
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState<"signup" | "login">("signup");
   const [activeTab, setActiveTab] = useState<"clean" | "suggest" | "viz" | "beforeafter">("clean");
-
-  useEffect(() => {
-    const storedUser = localStorage.getItem("cleanml_user");
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    }
-  }, []);
 
   const handleAuthSuccess = () => {
     const storedUser = localStorage.getItem("cleanml_user");
@@ -76,56 +71,7 @@ export default function LandingPage() {
       />
 
       {/* Navbar */}
-      <nav className="bg-white border-b border-gray-100 px-8 py-4 flex items-center justify-between sticky top-0 z-50 shadow-sm">
-        <Link href="/" className="flex items-center space-x-3 text-indigo-650 hover:opacity-90 transition-opacity">
-          <svg className="w-8 h-8 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path>
-          </svg>
-          <span className="text-2xl font-extrabold tracking-tight text-gray-900">CleanML</span>
-        </Link>
-        
-        <div className="flex items-center space-x-4">
-          <div className="hidden md:flex space-x-6 text-sm font-semibold text-gray-500 items-center">
-            <Link href="/feedback" className="hover:text-violet-600 transition-colors">Feedback</Link>
-            <Link href="/docs" className="hover:text-violet-600 transition-colors">Docs</Link>
-          </div>
-          
-          {user ? (
-            <div className="flex items-center space-x-4 pl-4 border-l border-gray-150">
-              <Link
-                href="/clean"
-                className="text-sm font-bold text-white bg-violet-600 hover:bg-violet-750 px-5 py-2 rounded-full transition-all shadow-sm"
-              >
-                Go to App
-              </Link>
-              <div className="w-8 h-8 rounded-full bg-violet-100 text-violet-750 font-bold flex items-center justify-center text-xs" title={user.email}>
-                {user.name.slice(0, 2).toUpperCase()}
-              </div>
-            </div>
-          ) : (
-            <div className="flex items-center space-x-3">
-              <button
-                onClick={() => {
-                  setAuthMode("login");
-                  setIsAuthOpen(true);
-                }}
-                className="text-sm font-semibold text-gray-500 hover:text-gray-700 px-3 py-1.5 transition-colors"
-              >
-                Log In
-              </button>
-              <button
-                onClick={() => {
-                  setAuthMode("signup");
-                  setIsAuthOpen(true);
-                }}
-                className="text-sm font-bold text-white bg-violet-600 hover:bg-violet-750 px-5 py-2 rounded-full transition-all shadow-md hover:shadow-lg"
-              >
-                Try Free
-              </button>
-            </div>
-          )}
-        </div>
-      </nav>
+      <Navbar isLanding={true} activeTab="home" />
 
       {/* Hero Section */}
       <header className="relative py-20 px-8 bg-gradient-to-b from-white to-gray-50/50">
